@@ -1,16 +1,17 @@
+from measures import calculate_complexity
+import pathlib
 from typing import Optional
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.random import get_rng_state
+from torch.utils.tensorboard import SummaryWriter
 
 from dataset_helpers import get_dataloaders
 from experiment_config import (
-  DatasetType, EConfig, ETrainingState, OptimizerType)
+  DatasetType, ComplexityType, EConfig, ETrainingState, OptimizerType, Verbosity)
 from models import get_model_for_config
-import pathlib
 
 class Experiment:
   def __init__(self, e_state:ETrainingState, e_config: Optional[EConfig]=None):
@@ -29,11 +30,12 @@ class Experiment:
     
     # Model
     self.model = get_model_for_config(self.cfg)
-    if self.cfg.cuda:
-      print('Using CUDA')
-      self.model.cuda()
-    else:
-      print('Using CPU')
+    if self.cfg.verbosity > Verbosity.NONE:
+      if self.cfg.cuda:
+        print('Using CUDA')
+        self.model.cuda()
+      else:
+        print('Using CPU')
     
     # Optimizer
     if self.cfg.optimizer_type == OptimizerType.SGD:
@@ -55,6 +57,11 @@ class Experiment:
       self.optimizer.load_state_dict(optim_state)
       np.random.set_state(np_rng_state)
       torch.set_rng_state(torch_rng_state)
+    
+    if self.cfg.log_tensorboard:
+      log_file = self.cfg.log_dir / str(self.e_state.id) / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda)
+      self.writer = SummaryWriter(log_file)
+      self.writer.add_graph(self.model, self.train_loader.dataset[0][0])
 
   def _train_epoch(self) -> None:
     self.model.train()
@@ -64,11 +71,20 @@ class Experiment:
 
       self.optimizer.zero_grad()
       output = self.model(data)
-      loss = self.objective(output, target)
+      risk = self.objective(output, target)
+      complexity = torch.zeros(1)
+      if self.cfg.complexity_type == ComplexityType.L2:
+        complexity = calculate_complexity(self.model, self.cfg.complexity_type)
+      loss = risk + self.cfg.complexity_lambda * complexity
       loss.backward()
       self.optimizer.step()
 
-      if self.cfg.log_batch_freq is not None and batch_idx % self.cfg.log_batch_freq == 0:
+      if self.cfg.log_tensorboard:
+        self.writer.add_scalar('train/risk', risk.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
+        self.writer.add_scalar('train/complexity', complexity.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
+        self.writer.add_scalar('train/loss', loss.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
+
+      if self.cfg.verbosity >= Verbosity.BATCH and self.cfg.log_batch_freq is not None and batch_idx % self.cfg.log_batch_freq == 0:
         print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
             self.e_state.epoch,
             batch_idx * len(data),
@@ -78,16 +94,19 @@ class Experiment:
     if self.e_state.epoch % self.cfg.save_epoch_freq == 0:
       self.save_state()
 
-  def train(self) -> None:
+  def train(self):
     for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
       self.e_state.epoch = epoch
       self._train_epoch()
       self.evaluate(type=1)
 
-    print('Training complete!! For hidden size = {} and layers = {}'.format(self.model.num_hidden, self.model.num_layers))
+    if self.cfg.verbosity >= Verbosity.RUN:
+      print('Training complete!! For hidden size = {} and layers = {}'.format(self.model.num_hidden, self.model.num_layers))
+    
+    return self.evaluate(type=1)
   
   @torch.no_grad()
-  def evaluate(self, type, probs_required=False):
+  def evaluate(self, type, probs_required=False, verbose=True):
     self.model.eval()
     total_loss = 0
     num_correct = 0
@@ -116,17 +135,24 @@ class Experiment:
     avg_loss = total_loss / num_to_evaluate_on
     if self.cfg.dataset_type != DatasetType.REGRESSION:
       acc = num_correct / num_to_evaluate_on
-      print('\nAfter {} epochs ({} iterations), {} set: Average loss: {:.4f},Accuracy: {}/{} ({:.2f}%)\n'.format(self.e_state.epoch,
-            self.e_state.epoch, ['Training', 'Validation', 'Test'][type],
-            avg_loss, num_correct, num_to_evaluate_on, 100. * acc))
+      if verbose and self.cfg.verbosity >= Verbosity.EPOCH:
+        print('\nAfter {} epochs ({} iterations), {} set: Average loss: {:.4f},Accuracy: {}/{} ({:.2f}%)\n'.format(self.e_state.epoch,
+              self.e_state.epoch, ['Training', 'Validation', 'Test'][type],
+              avg_loss, num_correct, num_to_evaluate_on, 100. * acc))
+      if verbose and self.cfg.log_tensorboard:
+        self.writer.add_scalar('val/acc', acc, self.e_state.epoch)
+        self.writer.add_scalar('val/loss', avg_loss, self.e_state.epoch)
+        if self.cfg.epochs == self.e_state.epoch:
+          self.writer.add_hparams(self.cfg.to_tensorboard_dict(), {'hparam/accuracy': acc, 'hparam/loss': avg_loss})
       if probs_required:
         return acc, avg_loss, correct, probs
       else:
         return acc, avg_loss, correct
     else:
-      print('\nAfter {} epochs ({} iterations), {} set: Average loss: {:.4f}\n'.format(self.e_state.epoch,
-        self.e_state.epoch, ['Training', 'Validation', 'Test'][type],
-        avg_loss))
+      if verbose and self.cfg.verbosity > Verbosity.EPOCH:
+        print('\nAfter {} epochs ({} iterations), {} set: Average loss: {:.4f}\n'.format(self.e_state.epoch,
+              self.e_state.epoch, ['Training', 'Validation', 'Test'][type],
+              avg_loss))
       if probs_required:
         return avg_loss, avg_loss, avg_loss, probs
       else:
