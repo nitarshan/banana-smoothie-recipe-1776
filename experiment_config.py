@@ -1,13 +1,12 @@
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 class DatasetType(Enum):
   MNIST = 1
   CIFAR10 = 2
   CIFAR100 = 3
-  REGRESSION = 4
 
 class DatasetSubsetType(Enum):
   TRAIN = 1
@@ -80,5 +79,5 @@ class EConfig:
     del d["log_dir"]
     del d["checkpoint_dir"]
     del d["resume_from_checkpoint"]
-    
+
     return d

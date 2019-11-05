@@ -36,7 +36,7 @@ def launch_experiment(runs: int = 1, complexities: List[float] = [0, 0.1, 0.2, 0
       args_queue.append((e_state, e_config))
   with mp.Pool() as pool:
     results = pool.starmap(_train_process, args_queue)
-  
+
   results = [(cfg[1].complexity_lambda, r[0], r[1]) for cfg, r in zip(args_queue, results)]
   np.save('results', results)
 

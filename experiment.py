@@ -1,4 +1,3 @@
-from measures import calculate_complexity
 import pathlib
 from typing import Optional
 
@@ -10,7 +9,8 @@ from torch.utils.tensorboard import SummaryWriter
 
 from dataset_helpers import get_dataloaders
 from experiment_config import (
-  DatasetType, ComplexityType, EConfig, ETrainingState, OptimizerType, Verbosity)
+  ComplexityType, EConfig, ETrainingState, OptimizerType, Verbosity)
+from measures import calculate_complexity
 from models import get_model_for_config
 
 class Experiment:
@@ -23,11 +23,11 @@ class Experiment:
       self.cfg: EConfig = cfg_state
     if e_config is not None:
       self.cfg: EConfig = e_config
-    
+
     # Random Seeds
     torch.manual_seed(self.cfg.seed)
     np.random.seed(self.cfg.seed)
-    
+
     # Model
     self.model = get_model_for_config(self.cfg)
     if self.cfg.verbosity > Verbosity.NONE:
@@ -36,17 +36,14 @@ class Experiment:
         self.model.cuda()
       else:
         print('Using CPU')
-    
+
     # Optimizer
     if self.cfg.optimizer_type == OptimizerType.SGD:
       self.optimizer = optim.SGD(self.model.parameters(), lr=self.cfg.lr)
     else:
       raise KeyError
 
-    if self.cfg.dataset_type == DatasetType.REGRESSION:
-      self.objective = F.mse_loss
-    else:
-      self.objective = F.nll_loss
+    self.risk_objective = F.nll_loss
 
     # Load data
     self.train_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type)
@@ -57,7 +54,7 @@ class Experiment:
       self.optimizer.load_state_dict(optim_state)
       np.random.set_state(np_rng_state)
       torch.set_rng_state(torch_rng_state)
-    
+
     if self.cfg.log_tensorboard:
       log_file = self.cfg.log_dir / str(self.e_state.id) / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda)
       self.writer = SummaryWriter(log_file)
@@ -71,7 +68,7 @@ class Experiment:
 
       self.optimizer.zero_grad()
       output = self.model(data)
-      risk = self.objective(output, target)
+      risk = self.risk_objective(output, target)
       complexity = torch.zeros(1)
       if self.cfg.complexity_type == ComplexityType.L2:
         complexity = calculate_complexity(self.model, self.cfg.complexity_type)
@@ -102,16 +99,15 @@ class Experiment:
 
     if self.cfg.verbosity >= Verbosity.RUN:
       print('Training complete!! For hidden size = {} and layers = {}'.format(self.model.num_hidden, self.model.num_layers))
-    
+
     return self.evaluate(type=1)
-  
+
   @torch.no_grad()
-  def evaluate(self, type, probs_required=False, verbose=True):
+  def evaluate(self, type, verbose=True):
     self.model.eval()
     total_loss = 0
     num_correct = 0
     correct = torch.FloatTensor(0, 1)
-    probs = None
 
     data_loader = [self.train_loader, self.val_loader, self.test_loader][type]
     num_to_evaluate_on = len(data_loader.dataset)
@@ -120,44 +116,25 @@ class Experiment:
       if self.cfg.cuda:
         data, target = data.cuda(), target.cuda()
       prob = self.model(data)
-      total_loss += self.objective(prob, target, reduction='sum').item()  # sum up batch loss
-      if self.cfg.dataset_type != DatasetType.REGRESSION:
-        pred = prob.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
-        batch_correct = pred.eq(target.data.view_as(pred)).type(torch.FloatTensor).cpu()
-        correct = torch.cat([correct, batch_correct], 0)
-        num_correct += batch_correct.sum()
-      if probs_required:
-        if probs is None:
-          probs = prob.data
-        else:
-          probs = torch.cat([probs, prob.data], 0)
+      total_loss += self.risk_objective(prob, target, reduction='sum').item()  # sum up batch loss
+      pred = prob.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
+      batch_correct = pred.eq(target.data.view_as(pred)).type(torch.FloatTensor).cpu()
+      correct = torch.cat([correct, batch_correct], 0)
+      num_correct += batch_correct.sum()
 
     avg_loss = total_loss / num_to_evaluate_on
-    if self.cfg.dataset_type != DatasetType.REGRESSION:
-      acc = num_correct / num_to_evaluate_on
-      if verbose and self.cfg.verbosity >= Verbosity.EPOCH:
-        print('\nAfter {} epochs ({} iterations), {} set: Average loss: {:.4f},Accuracy: {}/{} ({:.2f}%)\n'.format(self.e_state.epoch,
-              self.e_state.epoch, ['Training', 'Validation', 'Test'][type],
-              avg_loss, num_correct, num_to_evaluate_on, 100. * acc))
-      if verbose and self.cfg.log_tensorboard:
-        self.writer.add_scalar('val/acc', acc, self.e_state.epoch)
-        self.writer.add_scalar('val/loss', avg_loss, self.e_state.epoch)
-        if self.cfg.epochs == self.e_state.epoch:
-          self.writer.add_hparams(self.cfg.to_tensorboard_dict(), {'hparam/accuracy': acc, 'hparam/loss': avg_loss})
-      if probs_required:
-        return acc, avg_loss, correct, probs
-      else:
-        return acc, avg_loss, correct
-    else:
-      if verbose and self.cfg.verbosity > Verbosity.EPOCH:
-        print('\nAfter {} epochs ({} iterations), {} set: Average loss: {:.4f}\n'.format(self.e_state.epoch,
-              self.e_state.epoch, ['Training', 'Validation', 'Test'][type],
-              avg_loss))
-      if probs_required:
-        return avg_loss, avg_loss, avg_loss, probs
-      else:
-        return avg_loss, avg_loss, avg_loss
-  
+    acc = num_correct / num_to_evaluate_on
+    if verbose and self.cfg.verbosity >= Verbosity.EPOCH:
+      print('\nAfter {} epochs ({} iterations), {} set: Average loss: {:.4f},Accuracy: {}/{} ({:.2f}%)\n'.format(self.e_state.epoch,
+            self.e_state.epoch, ['Training', 'Validation', 'Test'][type],
+            avg_loss, num_correct, num_to_evaluate_on, 100. * acc))
+    if verbose and self.cfg.log_tensorboard:
+      self.writer.add_scalar('val/acc', acc, self.e_state.epoch)
+      self.writer.add_scalar('val/loss', avg_loss, self.e_state.epoch)
+      if self.cfg.epochs == self.e_state.epoch:
+        self.writer.add_hparams(self.cfg.to_tensorboard_dict(), {'hparam/accuracy': acc, 'hparam/loss': avg_loss})
+    return acc, avg_loss, correct
+
   def save_state(self) -> None:
     checkpoint_path = self.cfg.checkpoint_dir / str(self.e_state.id)
     checkpoint_path.mkdir(parents=True, exist_ok=True)

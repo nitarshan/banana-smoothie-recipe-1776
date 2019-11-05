@@ -42,7 +42,7 @@ class DeepNet(ExperimentBaseModel):
 
         if self.dataset_properties.is_classification:
             x = F.log_softmax(x, dim=1)
-        
+
         return x
 
     def get_weight_norms(self, p=2):
