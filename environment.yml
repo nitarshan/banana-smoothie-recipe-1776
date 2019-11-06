@@ -1,4 +1,4 @@
-name: causal_complexity_measures
+name: ccm
 channels:
   - defaults
   - pytorch
