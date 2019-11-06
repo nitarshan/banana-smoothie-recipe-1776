@@ -110,8 +110,8 @@ venv.bak/
 .vscode/
 
 # Project
-.env/
-.checkpoints/
-.data/
-.logs/
-.results/
+env/
+checkpoints/
+data/
+logs/
+results/
