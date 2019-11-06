@@ -1,4 +1,5 @@
 import pathlib
+import time
 from typing import Optional
 
 import numpy as np
@@ -32,10 +33,10 @@ class Experiment:
     self.model = get_model_for_config(self.cfg)
     if self.cfg.verbosity > Verbosity.NONE:
       if self.cfg.cuda:
-        print('Using CUDA')
+        print('[{}] Using CUDA'.format(self.e_state.id))
         self.model.cuda()
       else:
-        print('Using CPU')
+        print('[{}] Using CPU'.format(self.e_state.id))
 
     # Optimizer
     if self.cfg.optimizer_type == OptimizerType.SGD:
@@ -58,7 +59,7 @@ class Experiment:
     if self.cfg.log_tensorboard:
       log_file = self.cfg.log_dir / str(self.e_state.id) / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda)
       self.writer = SummaryWriter(log_file)
-      self.writer.add_graph(self.model, self.train_loader.dataset[0][0])
+      #self.writer.add_graph(self.model, self.train_loader.dataset[0][0])
 
   def _train_epoch(self) -> None:
     self.model.train()
@@ -92,15 +93,22 @@ class Experiment:
       self.save_state()
 
   def train(self):
+    if self.cfg.verbosity >= Verbosity.RUN:
+      start_time = time.time()
+      print('[{}] Training starting'.format(self.e_state.id))
+    
     for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
       self.e_state.epoch = epoch
       self._train_epoch()
       self.evaluate(type=1)
 
     if self.cfg.verbosity >= Verbosity.RUN:
-      print('Training complete!! For hidden size = {} and layers = {}'.format(self.model.num_hidden, self.model.num_layers))
+      print('[{}] Training complete in {}s'.format(self.e_state.id, time.time() - start_time))
 
-    return self.evaluate(type=1)
+    if self.cfg.log_tensorboard:
+      self.writer.flush()
+      self.writer.close()
+    return self.evaluate(type=1, verbose=False)
 
   @torch.no_grad()
   def evaluate(self, type, verbose=True):
@@ -123,6 +131,7 @@ class Experiment:
       num_correct += batch_correct.sum()
 
     avg_loss = total_loss / num_to_evaluate_on
+    complexity_loss = calculate_complexity(self.model, self.cfg.complexity_type).item()
     acc = num_correct / num_to_evaluate_on
     if verbose and self.cfg.verbosity >= Verbosity.EPOCH:
       print('\nAfter {} epochs ({} iterations), {} set: Average loss: {:.4f},Accuracy: {}/{} ({:.2f}%)\n'.format(self.e_state.epoch,
@@ -133,7 +142,7 @@ class Experiment:
       self.writer.add_scalar('val/loss', avg_loss, self.e_state.epoch)
       if self.cfg.epochs == self.e_state.epoch:
         self.writer.add_hparams(self.cfg.to_tensorboard_dict(), {'hparam/accuracy': acc, 'hparam/loss': avg_loss})
-    return acc, avg_loss, correct
+    return acc, avg_loss, complexity_loss, correct
 
   def save_state(self) -> None:
     checkpoint_path = self.cfg.checkpoint_dir / str(self.e_state.id)

@@ -8,10 +8,10 @@ class DatasetType(Enum):
   CIFAR10 = 2
   CIFAR100 = 3
 
-class DatasetSubsetType(Enum):
-  TRAIN = 1
-  VAL = 2
-  TEST = 3
+class DatasetSubsetType(IntEnum):
+  TRAIN = 0
+  VAL = 1
+  TEST = 2
 
 class ModelType(Enum):
   DEEP = 1
