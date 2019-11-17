@@ -1,0 +1,15 @@
+name: CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Setup Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Setup Conda Env
+      run: |
+        $CONDA/bin/conda create --prefix ./env -f environment.yml
+        $CONDA/bin/conda activate ./env
