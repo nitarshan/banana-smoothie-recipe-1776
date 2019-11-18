@@ -15,17 +15,9 @@ from experiment import Experiment
 from experiment_config import (
   ComplexityType, DatasetType, EConfig, ETrainingState, ModelType, Verbosity)
 
-# Has to be top-level fn, in order to be pickled by mp.Pool
-def _train_process(x,y):
-  sns.set()
-  device = torch.device('cuda' if y.cuda else 'cpu', mp.current_process()._identity[0]-1 if y.cuda else 0)
-  return Experiment(x, device, y).train()
-
 # New Experiment
-def deep_mnist_l2_experiment(
+def main(
   root_dir: str,
-  runs: int = 3,
-  complexities: List[float] = [0, 0.05, 0.1],
   use_cuda: bool = False
 ) -> None:
   experiment_id = time.time_ns()
@@ -46,8 +38,8 @@ def deep_mnist_l2_experiment(
   print('[Experiment {}] Data path {}'.format(experiment_id, results_path))
 
   args_queue = []
-  for complexity_lambda in complexities:
-    for _ in range(runs):
+  for complexity_lambda in [0, 0.05, 0.1]:
+    for _ in range(3):
       id = time.time_ns()
       seed = id % (2**32)
       e_state = ETrainingState(id=id)
@@ -67,25 +59,11 @@ def deep_mnist_l2_experiment(
         verbosity=Verbosity.EPOCH
       )
       args_queue.append((e_state, e_config))
+      print('python run.py {} {} {} {} {} {} {} {} {}'.format(
 
-  num_processes = 1 if use_cuda else mp.cpu_count()
-  print('[Experiment {}] # Processes {}'.format(experiment_id, num_processes))
-  with mp.Pool(num_processes) as pool:
-    results = pool.starmap(_train_process, args_queue)
-
-  results = [(cfg[1].complexity_lambda, r[0], r[1], r[2]) for cfg, r in zip(args_queue, results)]
-  results = np.array(results)
-  results = pd.DataFrame(results, columns=['lambda', 'val_acc', 'val_risk', 'complexity'])
-  results.to_pickle(results_path / '{}.pkl'.format(experiment_id))
-  fig = sns.lineplot(x='lambda', y='val_acc', data=results).set_title('L2 Lambda vs Accuracy')
-  writer.add_figure('{}/lambda_vs_acc'.format(experiment_id), fig.get_figure(), 1, True)
-  fig = sns.lineplot(x='lambda', y='val_risk', data=results).set_title('L2 Lambda vs Empirical Risk')
-  writer.add_figure('{}/lambda_vs_risk'.format(experiment_id), fig.get_figure(), 1, True)
-  fig = sns.lineplot(x='lambda', y='complexity', data=results).set_title('L2 Lambda vs Complexity')
-  writer.add_figure('{}/lambda_vs_complexity'.format(experiment_id), fig.get_figure(), 1, True)
-  writer.flush()
-  writer.close()
+      ))
+      
 
 if __name__ == '__main__':
   mp.set_start_method('spawn')
-  fire.Fire(deep_mnist_l2_experiment)
+  fire.Fire(main)

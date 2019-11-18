@@ -15,8 +15,9 @@ from measures import calculate_complexity
 from models import get_model_for_config
 
 class Experiment:
-  def __init__(self, e_state:ETrainingState, e_config: Optional[EConfig]=None):
+  def __init__(self, e_state:ETrainingState, device: torch.device, e_config: Optional[EConfig]=None):
     self.e_state = e_state
+    self.device = device
     resume_from_checkpoint = (e_config is None) or e_config.resume_from_checkpoint
 
     if resume_from_checkpoint:
@@ -31,12 +32,7 @@ class Experiment:
 
     # Model
     self.model = get_model_for_config(self.cfg)
-    if self.cfg.verbosity > Verbosity.NONE:
-      if self.cfg.cuda:
-        print('[{}] Using CUDA'.format(self.e_state.id))
-        self.model.cuda()
-      else:
-        print('[{}] Using CPU'.format(self.e_state.id))
+    self.model.to(device)
 
     # Optimizer
     if self.cfg.optimizer_type == OptimizerType.SGD:
@@ -47,7 +43,7 @@ class Experiment:
     self.risk_objective = F.nll_loss
 
     # Load data
-    self.train_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type)
+    self.train_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir)
 
     # Cleanup when resuming from checkpoint
     if resume_from_checkpoint:
@@ -64,9 +60,7 @@ class Experiment:
   def _train_epoch(self) -> None:
     self.model.train()
     for batch_idx, (data, target) in enumerate(self.train_loader):
-      if self.cfg.cuda:
-        data, target = data.cuda(), target.cuda()
-
+      data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       self.optimizer.zero_grad()
       output = self.model(data)
       risk = self.risk_objective(output, target)
@@ -95,7 +89,7 @@ class Experiment:
   def train(self):
     if self.cfg.verbosity >= Verbosity.RUN:
       start_time = time.time()
-      print('[{}] Training starting'.format(self.e_state.id))
+      print('[{}] Training starting using {}'.format(self.e_state.id, self.device))
     
     for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
       self.e_state.epoch = epoch
@@ -121,8 +115,7 @@ class Experiment:
     num_to_evaluate_on = len(data_loader.dataset)
 
     for data, target in data_loader:
-      if self.cfg.cuda:
-        data, target = data.cuda(), target.cuda()
+      data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       prob = self.model(data)
       total_loss += self.risk_objective(prob, target, reduction='sum').item()  # sum up batch loss
       pred = prob.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
@@ -134,8 +127,8 @@ class Experiment:
     complexity_loss = calculate_complexity(self.model, self.cfg.complexity_type).item()
     acc = num_correct / num_to_evaluate_on
     if verbose and self.cfg.verbosity >= Verbosity.EPOCH:
-      print('\nAfter {} epochs ({} iterations), {} set: Average loss: {:.4f},Accuracy: {}/{} ({:.2f}%)\n'.format(self.e_state.epoch,
-            self.e_state.epoch, ['Training', 'Validation', 'Test'][type],
+      print('After {} epochs, {} loss: {:.4f}, accuracy: {}/{} ({:.2f}%)'.format(self.e_state.epoch,
+            ['Training', 'Validation', 'Test'][type],
             avg_loss, num_correct, num_to_evaluate_on, 100. * acc))
     if verbose and self.cfg.log_tensorboard:
       self.writer.add_scalar('val/acc', acc, self.e_state.epoch)

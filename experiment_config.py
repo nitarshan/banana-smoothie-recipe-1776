@@ -24,10 +24,6 @@ class OptimizerType(Enum):
   SGD = 1
   ADAM = 2
 
-class ObjectiveType(Enum):
-  MSE = 1
-  CE = 2
-
 class Verbosity(IntEnum):
   NONE = 1
   RUN = 2
@@ -43,7 +39,7 @@ class ETrainingState:
 @dataclass(frozen=True)
 class EConfig:
   seed: int
-  cuda: bool
+  use_cuda: bool
   # Model
   model_type: ModelType
   # Dataset
