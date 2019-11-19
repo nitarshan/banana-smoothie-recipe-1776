@@ -11,8 +11,3 @@ jobs:
         python-version: 3.7
     - name: Create Conda Env
       run: $CONDA/bin/conda env create -f environment.yml --prefix env
-    - name: Activate Conda Env
-      run: |
-        $CONDA/bin/conda init
-        source $HOME/.bashrc
-        $CONDA/bin/conda activate ./env
