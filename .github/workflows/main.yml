@@ -13,5 +13,5 @@ jobs:
       run: $CONDA/bin/conda env create -f environment.yml --prefix env
     - name: Activate Conda Env
       run: |
-        . /opt/conda/etc/profile.d/conda.sh
+        $CONDA/bin/conda init
         $CONDA/bin/conda activate ./env
