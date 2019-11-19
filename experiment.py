@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from dataset_helpers import get_dataloaders
 from experiment_config import (
-  ComplexityType, EConfig, ETrainingState, OptimizerType, Verbosity)
+  ComplexityType, EConfig, ETrainingState, OptimizerType, Verbosity, DatasetSubsetType)
 from measures import calculate_complexity
 from models import get_model_for_config
 
@@ -43,7 +43,7 @@ class Experiment:
     self.risk_objective = F.nll_loss
 
     # Load data
-    self.train_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir)
+    self.train_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.use_cuda)
 
     # Cleanup when resuming from checkpoint
     if resume_from_checkpoint:
@@ -77,12 +77,8 @@ class Experiment:
         self.writer.add_scalar('train/loss', loss.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
 
       if self.cfg.verbosity >= Verbosity.BATCH and self.cfg.log_batch_freq is not None and batch_idx % self.cfg.log_batch_freq == 0:
-        print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-            self.e_state.epoch,
-            batch_idx * len(data),
-            len(self.train_loader.dataset),
-            100. * batch_idx / len(self.train_loader),
-            loss.item()))
+        print('[{}] Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+          self.e_state.id, self.e_state.epoch, batch_idx * len(data), len(self.train_loader.dataset), 100. * batch_idx / len(self.train_loader), loss.item()))
     if self.e_state.epoch % self.cfg.save_epoch_freq == 0:
       self.save_state()
 
@@ -94,7 +90,7 @@ class Experiment:
     for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
       self.e_state.epoch = epoch
       self._train_epoch()
-      self.evaluate(type=1)
+      self.evaluate(DatasetSubsetType.VAL)
 
     if self.cfg.verbosity >= Verbosity.RUN:
       print('[{}] Training complete in {}s'.format(self.e_state.id, time.time() - start_time))
@@ -102,16 +98,16 @@ class Experiment:
     if self.cfg.log_tensorboard:
       self.writer.flush()
       self.writer.close()
-    return self.evaluate(type=1, verbose=False)
+    return self.evaluate(DatasetSubsetType.VAL, verbose=False)
 
   @torch.no_grad()
-  def evaluate(self, type, verbose=True):
+  def evaluate(self, dataset_subset_type: DatasetSubsetType, verbose=True):
     self.model.eval()
     total_loss = 0
     num_correct = 0
     correct = torch.FloatTensor(0, 1)
 
-    data_loader = [self.train_loader, self.val_loader, self.test_loader][type]
+    data_loader = [self.train_loader, self.val_loader, self.test_loader][dataset_subset_type]
     num_to_evaluate_on = len(data_loader.dataset)
 
     for data, target in data_loader:
@@ -127,9 +123,8 @@ class Experiment:
     complexity_loss = calculate_complexity(self.model, self.cfg.complexity_type).item()
     acc = num_correct / num_to_evaluate_on
     if verbose and self.cfg.verbosity >= Verbosity.EPOCH:
-      print('After {} epochs, {} loss: {:.4f}, accuracy: {}/{} ({:.2f}%)'.format(self.e_state.epoch,
-            ['Training', 'Validation', 'Test'][type],
-            avg_loss, num_correct, num_to_evaluate_on, 100. * acc))
+      print('[{}] After {} epochs, {} loss: {:.4f}, accuracy: {}/{} ({:.2f}%)'.format(
+        self.e_state.id, self.e_state.epoch, dataset_subset_type.name, avg_loss, num_correct, num_to_evaluate_on, 100. * acc))
     if verbose and self.cfg.log_tensorboard:
       self.writer.add_scalar('val/acc', acc, self.e_state.epoch)
       self.writer.add_scalar('val/loss', avg_loss, self.e_state.epoch)
@@ -150,6 +145,6 @@ class Experiment:
     }, checkpoint_file)
 
   def load_state(self) -> (EConfig, dict, dict, np.ndarray, torch.ByteTensor):
-    checkpoint_file = pathlib.Path('checkpoints') / str(self.e_state.id) / (str(self.e_state.epoch - 1) + '.pt')
+    checkpoint_file = self.cfg.checkpoint_dir / str(self.e_state.id) / (str(self.e_state.epoch - 1) + '.pt')
     checkpoint = torch.load(checkpoint_file)
     return checkpoint['config'], checkpoint['model'], checkpoint['optimizer'], checkpoint['np_rng'], checkpoint['torch_rng']

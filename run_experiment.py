@@ -2,6 +2,7 @@
 from pathlib import Path
 import time
 from typing import List
+import pickle
 
 import fire
 import numpy as np
@@ -16,13 +17,29 @@ from experiment_config import (
   ComplexityType, DatasetType, EConfig, ETrainingState, ModelType, Verbosity)
 
 # Has to be top-level fn, in order to be pickled by mp.Pool
-def _train_process(x,y):
+def _train_process(x: ETrainingState, y: EConfig):
   sns.set()
-  device = torch.device('cuda' if y.cuda else 'cpu', mp.current_process()._identity[0]-1 if y.cuda else 0)
+  device = torch.device('cuda' if y.use_cuda else 'cpu', ((mp.current_process()._identity[0]-1) % torch.cuda.device_count()) if y.use_cuda else 0)
   return Experiment(x, device, y).train()
 
-# New Experiment
-def deep_mnist_l2_experiment(
+def setup_paths(root_dir: str, experiment_id: int):
+  print('[Experiment {}] Setting up directories'.format(experiment_id))
+  root_path = Path(root_dir)
+  results_path = root_path / 'results'
+  results_path.mkdir(parents=True, exist_ok=True)
+  log_path = root_path / 'logs' / str(experiment_id)
+  data_path = root_path / 'data'
+  data_path.mkdir(parents=True, exist_ok=True)
+  checkpoint_path = root_path / 'checkpoints'
+  checkpoint_path.mkdir(parents=True, exist_ok=True)
+  print('[Experiment {}] Results path {}'.format(experiment_id, results_path))
+  print('[Experiment {}] Log path {}'.format(experiment_id, log_path))
+  print('[Experiment {}] Data path {}'.format(experiment_id, data_path))
+  print('[Experiment {}] Data path {}'.format(experiment_id, checkpoint_path))
+  return results_path, log_path, data_path, checkpoint_path
+
+# Leverage multiprocessing to parallelize experiments
+def multi(
   root_dir: str,
   runs: int = 3,
   complexities: List[float] = [0, 0.05, 0.1],
@@ -33,17 +50,7 @@ def deep_mnist_l2_experiment(
   print("[Experiment {}] CPU cores:".format(experiment_id), mp.cpu_count())
   print("[Experiment {}] CUDA devices:".format(experiment_id), torch.cuda.device_count())
 
-  print('[Experiment {}] Setting up directories'.format(experiment_id))
-  root_path = Path(root_dir)
-  results_path = root_path / 'results'
-  results_path.mkdir(parents=True, exist_ok=True)
-  print('[Experiment {}] Results path {}'.format(experiment_id, results_path))
-  log_path = root_path / 'logs' / str(experiment_id)
-  writer = SummaryWriter(log_path)
-  print('[Experiment {}] Log path {}'.format(experiment_id, results_path))
-  data_path = root_path / 'data'
-  data_path.mkdir(parents=True, exist_ok=True)
-  print('[Experiment {}] Data path {}'.format(experiment_id, results_path))
+  results_path, log_path, data_path, checkpoint_path = setup_paths(root_dir, experiment_id)
 
   args_queue = []
   for complexity_lambda in complexities:
@@ -57,7 +64,7 @@ def deep_mnist_l2_experiment(
         model_type= ModelType.DEEP,
         dataset_type=DatasetType.MNIST,
         batch_size=128,
-        epochs=50,
+        epochs=10,
         save_epoch_freq = 50,
         log_tensorboard=True,
         complexity_type=ComplexityType.L2,
@@ -68,10 +75,12 @@ def deep_mnist_l2_experiment(
       )
       args_queue.append((e_state, e_config))
 
-  num_processes = 1 if use_cuda else mp.cpu_count()
-  print('[Experiment {}] # Processes {}'.format(experiment_id, num_processes))
-  with mp.Pool(num_processes) as pool:
-    results = pool.starmap(_train_process, args_queue)
+  if use_cuda:
+    results = [_train_process(x, y) for x, y in args_queue]
+  else:
+    print('[Experiment {}] Parallel Experiment Threads {}'.format(experiment_id, mp.cpu_count()))
+    with mp.Pool(mp.cpu_count()) as pool:
+      results = pool.starmap(_train_process, args_queue)
 
   results = [(cfg[1].complexity_lambda, r[0], r[1], r[2]) for cfg, r in zip(args_queue, results)]
   results = np.array(results)
@@ -86,6 +95,56 @@ def deep_mnist_l2_experiment(
   writer.flush()
   writer.close()
 
+# Run a single
+def single(
+  root_dir: str,
+  model_type: str,
+  dataset_type: str,
+  complexity_type: str,
+  complexity_lambda: float,
+  epochs: int,
+  batch_size: int,
+  save_epoch_freq: int,
+  use_cuda: bool = True,
+  log_tensorboard: bool = True,
+) -> None:
+  experiment_id = time.time_ns()
+  print('[Experiment {}]'.format(experiment_id))
+  print("[Experiment {}] CPU cores:".format(experiment_id), mp.cpu_count())
+  print("[Experiment {}] CUDA devices:".format(experiment_id), torch.cuda.device_count())
+
+  results_path, log_path, data_path, checkpoint_path = setup_paths(root_dir, experiment_id)
+
+  seed = experiment_id % (2**32)
+  e_state = ETrainingState(id=experiment_id)
+  e_config = EConfig(
+    seed=seed,
+    use_cuda=use_cuda,
+    model_type= ModelType[model_type],
+    dataset_type=DatasetType[dataset_type],
+    batch_size=batch_size,
+    epochs=epochs,
+    save_epoch_freq = save_epoch_freq,
+    log_tensorboard=log_tensorboard,
+    complexity_type=ComplexityType[complexity_type],
+    complexity_lambda=complexity_lambda,
+    log_dir=log_path,
+    data_dir=data_path,
+    checkpoint_dir=checkpoint_path,
+    verbosity=Verbosity.EPOCH
+  )
+
+  device = torch.device('cuda' if use_cuda else 'cpu')
+  acc, avg_loss, complexity_loss, correct = Experiment(e_state, device, e_config).train()
+
+  results = {
+    'e_state': e_state,
+    'e_config': e_config,
+    'final_results': [complexity_lambda, acc, avg_loss, complexity_loss],
+  }
+  with open(results_path / '{}.pkl'.format(experiment_id), mode='wb') as results_file:
+    pickle.dump(results, results_file)
+
 if __name__ == '__main__':
   mp.set_start_method('spawn')
-  fire.Fire(deep_mnist_l2_experiment)
+  fire.Fire()

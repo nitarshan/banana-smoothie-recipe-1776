@@ -23,8 +23,8 @@ def get_dataset_properties(dataset_name: DatasetType) -> DatasetProperties:
     return DatasetProperties(DatasetType.CIFAR100, 3*32*32, 100, True)
   raise KeyError()
 
-def get_dataloaders(dataset_name: DatasetType, data_path: Path) -> (torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader):
-  kwargs = {'num_workers': 0, 'pin_memory': True}
+def get_dataloaders(dataset_name: DatasetType, data_path: Path, use_cuda: bool = False) -> (torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader):
+  kwargs = {'num_workers': 2 if use_cuda else 0, 'pin_memory': True}
 
   train, val, test = _get_datasets(dataset_name, 0.15, data_path)
 
@@ -35,16 +35,16 @@ def get_dataloaders(dataset_name: DatasetType, data_path: Path) -> (torch.utils.
   return train_loader, val_loader, test_loader
 
 def _get_datasets(dataset_name: DatasetType, val_split: float, data_path: Path) -> (torch.utils.data.Dataset, torch.utils.data.Dataset, torch.utils.data.Dataset):
-  transforms = tv.transforms.Compose([
+  mnist_transforms = tv.transforms.Compose([
     tv.transforms.ToTensor(),
-    tv.transforms.Normalize((0.1307,), (0.3081,))
+    tv.transforms.Normalize((0.1307,), (0.3081,)) # Normalize MNIST
   ])
   if dataset_name == DatasetType.MNIST:
-    train, test = _get_torchvision_dataset(dataset_name, tv.datasets.MNIST, transforms, data_path)
+    train, test = _get_torchvision_dataset(dataset_name, tv.datasets.MNIST, mnist_transforms, data_path)
   elif dataset_name == DatasetType.CIFAR10:
-    train, test = _get_torchvision_dataset(dataset_name, tv.datasets.CIFAR10, transforms, data_path)
+    train, test = _get_torchvision_dataset(dataset_name, tv.datasets.CIFAR10, mnist_transforms, data_path)
   elif dataset_name == DatasetType.CIFAR100:
-    train, test = _get_torchvision_dataset(dataset_name, tv.datasets.CIFAR100, transforms, data_path)
+    train, test = _get_torchvision_dataset(dataset_name, tv.datasets.CIFAR100, mnist_transforms, data_path)
   else:
     raise KeyError
 
