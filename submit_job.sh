@@ -21,10 +21,11 @@ mkdir $SLURM_TMPDIR/logs
 mkdir $SLURM_TMPDIR/checkpoints
 mkdir $SLURM_TMPDIR/results
 cp -r /network/data1/mnist/processed $SLURM_TMPDIR/data/MNIST/
+cp -r /network/data1/cifar/cifar-10-batches-py $SLURM_TMPDIR/data/
 
 # 3. Launch your job
 touch $SLURM_TMPDIR/experiment.log
-python run_experiment.py single $SLURM_TMPDIR DEEP MNIST L2 0.1 50 128 10 --use_cuda --log_tensorboard >> $SLURM_TMPDIR/experiment.log &
+python run_experiment.py single $SLURM_TMPDIR CONV ADAM 0.001 CIFAR10 L2 0.1 200 128 50 --use_cuda --log_tensorboard >> $SLURM_TMPDIR/experiment.log &
 
 # 4. Copy whatever you want to save on $SCRATCH
 cp -r $SLURM_TMPDIR/logs/. /network/tmp1/rajkuman/logs

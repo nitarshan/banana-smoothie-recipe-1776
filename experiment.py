@@ -37,13 +37,15 @@ class Experiment:
     # Optimizer
     if self.cfg.optimizer_type == OptimizerType.SGD:
       self.optimizer = optim.SGD(self.model.parameters(), lr=self.cfg.lr)
+    elif self.cfg.optimizer_type == OptimizerType.ADAM:
+      self.optimizer = optim.Adam(self.model.parameters(), lr=self.cfg.lr)
     else:
       raise KeyError
 
     self.risk_objective = F.nll_loss
 
     # Load data
-    self.train_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.device)
+    self.train_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device)
 
     # Cleanup when resuming from checkpoint
     if resume_from_checkpoint:
@@ -64,8 +66,9 @@ class Experiment:
       self.optimizer.zero_grad()
       output = self.model(data)
       risk = self.risk_objective(output, target)
-      complexity = torch.zeros(1)
-      if self.cfg.complexity_type == ComplexityType.L2:
+      if self.cfg.complexity_type == ComplexityType.NONE:
+        complexity = torch.zeros(1, device=self.device)
+      elif self.cfg.complexity_type == ComplexityType.L2:
         complexity = calculate_complexity(self.model, self.cfg.complexity_type)
       loss = risk + self.cfg.complexity_lambda * complexity
       loss.backward()

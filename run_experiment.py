@@ -14,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from experiment import Experiment
 from experiment_config import (
-  ComplexityType, DatasetType, EConfig, ETrainingState, ModelType, Verbosity)
+  ComplexityType, DatasetType, EConfig, ETrainingState, ModelType, OptimizerType, Verbosity)
 
 # Has to be top-level fn, in order to be pickled by mp.Pool
 def _train_process(x: ETrainingState, y: EConfig):
@@ -99,6 +99,8 @@ def multi(
 def single(
   root_dir: str,
   model_type: str,
+  optimizer_type: str,
+  lr: float,
   dataset_type: str,
   complexity_type: str,
   complexity_lambda: float,
@@ -123,6 +125,8 @@ def single(
     model_type= ModelType[model_type],
     dataset_type=DatasetType[dataset_type],
     batch_size=batch_size,
+    optimizer_type=OptimizerType[optimizer_type],
+    lr=lr,
     epochs=epochs,
     save_epoch_freq = save_epoch_freq,
     log_tensorboard=log_tensorboard,
