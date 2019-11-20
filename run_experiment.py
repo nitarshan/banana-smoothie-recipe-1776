@@ -35,7 +35,7 @@ def setup_paths(root_dir: str, experiment_id: int):
   print('[Experiment {}] Results path {}'.format(experiment_id, results_path))
   print('[Experiment {}] Log path {}'.format(experiment_id, log_path))
   print('[Experiment {}] Data path {}'.format(experiment_id, data_path))
-  print('[Experiment {}] Data path {}'.format(experiment_id, checkpoint_path))
+  print('[Experiment {}] Checkpoint path {}'.format(experiment_id, checkpoint_path))
   return results_path, log_path, data_path, checkpoint_path
 
 # Leverage multiprocessing to parallelize experiments

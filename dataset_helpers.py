@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-import os
 from pathlib import Path
 
 import torch
@@ -23,38 +22,36 @@ def get_dataset_properties(dataset_name: DatasetType) -> DatasetProperties:
     return DatasetProperties(DatasetType.CIFAR100, 3*32*32, 100, True)
   raise KeyError()
 
-def get_dataloaders(dataset_name: DatasetType, data_path: Path, use_cuda: bool = False) -> (torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader):
-  kwargs = {'num_workers': 2 if use_cuda else 0, 'pin_memory': True}
-
-  train, val, test = _get_datasets(dataset_name, 0.15, data_path)
-
-  train_loader = torch.utils.data.DataLoader(train, batch_size=128, shuffle=True, **kwargs)
-  val_loader = torch.utils.data.DataLoader(val, batch_size=128, shuffle=False, **kwargs)
-  test_loader = torch.utils.data.DataLoader(test, batch_size=128, shuffle=False, **kwargs)
-
-  return train_loader, val_loader, test_loader
-
-def _get_datasets(dataset_name: DatasetType, val_split: float, data_path: Path) -> (torch.utils.data.Dataset, torch.utils.data.Dataset, torch.utils.data.Dataset):
-  mnist_transforms = tv.transforms.Compose([
-    tv.transforms.ToTensor(),
-    tv.transforms.Normalize((0.1307,), (0.3081,)) # Normalize MNIST
-  ])
+def get_dataloaders(dataset_name: DatasetType, data_path: Path, device: torch.device) -> (torch.utils.data.DataLoader, torch.utils.data.DataLoader, torch.utils.data.DataLoader):
   if dataset_name == DatasetType.MNIST:
-    train, test = _get_torchvision_dataset(dataset_name, tv.datasets.MNIST, mnist_transforms, data_path)
-  elif dataset_name == DatasetType.CIFAR10:
-    train, test = _get_torchvision_dataset(dataset_name, tv.datasets.CIFAR10, mnist_transforms, data_path)
-  elif dataset_name == DatasetType.CIFAR100:
-    train, test = _get_torchvision_dataset(dataset_name, tv.datasets.CIFAR100, mnist_transforms, data_path)
+    train = MNIST(device, data_path, train=True, download=True)
+    test = MNIST(device, data_path, train=False, download=True)
   else:
     raise KeyError
 
-  validation_size = round(len(train)*val_split)
+  val_split = 0.15
+  validation_size = round(len(train) * val_split)
   train, val = torch.utils.data.random_split(train, (len(train) - validation_size, validation_size))
 
-  return train, val, test
+  train_loader = torch.utils.data.DataLoader(train, batch_size=128, shuffle=True, num_workers=0)
+  val_loader = torch.utils.data.DataLoader(val, batch_size=5000, shuffle=False, num_workers=0)
+  test_loader = torch.utils.data.DataLoader(test, batch_size=5000, shuffle=False, num_workers=0)
+  return train_loader, val_loader, test_loader
 
-def _get_torchvision_dataset(dataset_name: DatasetType, dataset_function, transforms, data_path: Path) -> (torch.utils.data.Dataset, torch.utils.data.Dataset):
-  data_dir = data_path
-  train = dataset_function(data_dir, train=True, download=True, transform=transforms)
-  test = dataset_function(data_dir, train=False, download=True, transform=transforms)
-  return train, test
+# https://gist.github.com/y0ast/f69966e308e549f013a92dc66debeeb4
+# We need to keep the class name the same as base class methods rely on it
+class MNIST(tv.datasets.MNIST):
+  def __init__(self, device, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+
+    # Scale data to [0,1]
+    self.data = self.data.unsqueeze(1).float().div(255)
+    
+    # Normalize it with the usual MNIST mean and std
+    self.data = self.data.sub_(0.1307).div_(0.3081)
+    
+    # Put both data and targets on GPU in advance
+    self.data, self.targets = self.data.to(device), self.targets.to(device)
+
+  def __getitem__(self, index):
+    return self.data[index], self.targets[index]

@@ -43,7 +43,7 @@ class Experiment:
     self.risk_objective = F.nll_loss
 
     # Load data
-    self.train_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.use_cuda)
+    self.train_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.device)
 
     # Cleanup when resuming from checkpoint
     if resume_from_checkpoint:
