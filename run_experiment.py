@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import time
-from typing import List
+from typing import List, Optional
 import pickle
 
 import fire
@@ -10,11 +10,10 @@ import pandas as pd
 import seaborn as sns
 import torch
 from torch import multiprocessing as mp
-from torch.utils.tensorboard import SummaryWriter
 
 from experiment import Experiment
 from experiment_config import (
-  ComplexityType, DatasetType, EConfig, ETrainingState, ModelType, OptimizerType, Verbosity)
+  ComplexityType, DatasetType, EConfig, ETrainingState, LagrangianType, ModelType, OptimizerType, Verbosity)
 
 # Has to be top-level fn, in order to be pickled by mp.Pool
 def _train_process(x: ETrainingState, y: EConfig):
@@ -99,16 +98,19 @@ def multi(
 def single(
   root_dir: str,
   model_type: str,
+  dataset_type: str,
   optimizer_type: str,
   lr: float,
-  dataset_type: str,
-  complexity_type: str,
-  complexity_lambda: float,
   epochs: int,
   batch_size: int,
-  save_epoch_freq: int,
+  complexity_type: str,
+  complexity_lambda: Optional[float],
+  lagrangian_type: str = LagrangianType.NONE.name,
+  lagrangian_target: Optional[float] = None,
+  lagrangian_start_epoch: Optional[int] = None,
   use_cuda: bool = True,
-  log_tensorboard: bool = True,
+  log_tensorboard: bool = False,
+  save_epoch_freq: Optional[int] = None,
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
@@ -132,12 +134,15 @@ def single(
     log_tensorboard=log_tensorboard,
     complexity_type=ComplexityType[complexity_type],
     complexity_lambda=complexity_lambda,
+    lagrangian_type=LagrangianType[lagrangian_type],
+    lagrangian_target=lagrangian_target,
+    lagrangian_start_epoch=lagrangian_start_epoch,
     log_dir=log_path,
     data_dir=data_path,
     checkpoint_dir=checkpoint_path,
     verbosity=Verbosity.EPOCH
   )
-
+  print(e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
   acc, avg_loss, complexity_loss, correct = Experiment(e_state, device, e_config).train()
 
@@ -151,4 +156,7 @@ def single(
 
 if __name__ == '__main__':
   mp.set_start_method('spawn')
-  fire.Fire()
+  try:
+    fire.Fire()
+  except KeyboardInterrupt:
+    print("Manually ended training")

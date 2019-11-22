@@ -9,9 +9,7 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
 from dataset_helpers import get_dataloaders
-from experiment_config import (
-  ComplexityType, EConfig, ETrainingState, OptimizerType, Verbosity, DatasetSubsetType)
-from measures import calculate_complexity
+from experiment_config import (EConfig, ETrainingState, LagrangianType, OptimizerType, Verbosity, DatasetSubsetType)
 from models import get_model_for_config
 
 class Experiment:
@@ -64,25 +62,35 @@ class Experiment:
     for batch_idx, (data, target) in enumerate(self.train_loader):
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       self.optimizer.zero_grad()
-      output = self.model(data)
-      risk = self.risk_objective(output, target)
-      if self.cfg.complexity_type == ComplexityType.NONE:
-        complexity = torch.zeros(1, device=self.device)
-      elif self.cfg.complexity_type == ComplexityType.L2:
-        complexity = calculate_complexity(self.model, self.cfg.complexity_type)
-      loss = risk + self.cfg.complexity_lambda * complexity
+      output, complexity = self.model(data, self.cfg.complexity_type)
+      empirical_risk = self.risk_objective(output, target)
+      loss = empirical_risk
+
+      if self.cfg.complexity_lambda is not None:
+        loss += self.cfg.complexity_lambda * complexity
+
+      # Constrained Optimization
+      if self.cfg.lagrangian_type != LagrangianType.NONE and self.e_state.epoch >= self.cfg.lagrangian_start_epoch:
+        rho = 1000
+        alpha = 0
+        constraint = (complexity - self.cfg.lagrangian_target)
+        if self.cfg.lagrangian_type == LagrangianType.PENALTY:
+          loss += rho * constraint ** 2
+        if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
+          loss += alpha * constraint
+
       loss.backward()
       self.optimizer.step()
 
       if self.cfg.log_tensorboard:
-        self.writer.add_scalar('train/risk', risk.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
+        self.writer.add_scalar('train/empirical_risk', empirical_risk.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
         self.writer.add_scalar('train/complexity', complexity.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
         self.writer.add_scalar('train/loss', loss.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
 
       if self.cfg.verbosity >= Verbosity.BATCH and self.cfg.log_batch_freq is not None and batch_idx % self.cfg.log_batch_freq == 0:
         print('[{}] Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
           self.e_state.id, self.e_state.epoch, batch_idx * len(data), len(self.train_loader.dataset), 100. * batch_idx / len(self.train_loader), loss.item()))
-    if self.e_state.epoch % self.cfg.save_epoch_freq == 0:
+    if self.cfg.save_epoch_freq is not None and self.e_state.epoch % self.cfg.save_epoch_freq == 0:
       self.save_state()
 
   def train(self):
@@ -93,7 +101,9 @@ class Experiment:
     for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
       self.e_state.epoch = epoch
       self._train_epoch()
-      self.evaluate(DatasetSubsetType.VAL)
+      if epoch % 10 == 0:
+        self.evaluate(DatasetSubsetType.VAL)
+        self.evaluate(DatasetSubsetType.TRAIN)
 
     if self.cfg.verbosity >= Verbosity.RUN:
       print('[{}] Training complete in {}s'.format(self.e_state.id, time.time() - start_time))
@@ -112,10 +122,12 @@ class Experiment:
 
     data_loader = [self.train_loader, self.val_loader, self.test_loader][dataset_subset_type]
     num_to_evaluate_on = len(data_loader.dataset)
+    complexities = []
 
     for data, target in data_loader:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
-      prob = self.model(data)
+      prob, com = self.model(data, self.cfg.complexity_type)
+      complexities.append(com)
       total_loss += self.risk_objective(prob, target, reduction='sum').item()  # sum up batch loss
       pred = prob.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
       batch_correct = pred.eq(target.data.view_as(pred)).type(torch.FloatTensor).cpu()
@@ -123,11 +135,11 @@ class Experiment:
       num_correct += batch_correct.sum()
 
     avg_loss = total_loss / num_to_evaluate_on
-    complexity_loss = calculate_complexity(self.model, self.cfg.complexity_type).item()
+    complexity_loss = sum(complexities).item() / len(complexities)
     acc = num_correct / num_to_evaluate_on
     if verbose and self.cfg.verbosity >= Verbosity.EPOCH:
-      print('[{}] After {} epochs, {} loss: {:.4f}, accuracy: {}/{} ({:.2f}%)'.format(
-        self.e_state.id, self.e_state.epoch, dataset_subset_type.name, avg_loss, num_correct, num_to_evaluate_on, 100. * acc))
+      print('[{}][Epoch {}][{:5} L: {:.4g}, C: {:.4g}, A: {:.0f}/{} ({:.2f}%)]'.format(
+        self.e_state.id, self.e_state.epoch, dataset_subset_type.name, avg_loss, complexity_loss, num_correct, num_to_evaluate_on, 100. * acc))
     if verbose and self.cfg.log_tensorboard:
       self.writer.add_scalar('val/acc', acc, self.e_state.epoch)
       self.writer.add_scalar('val/loss', avg_loss, self.e_state.epoch)

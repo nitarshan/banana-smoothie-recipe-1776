@@ -20,6 +20,10 @@ class ModelType(Enum):
 class ComplexityType(Enum):
   NONE = 1
   L2 = 2
+  PROD_OF_FRO = 3
+  SUM_OF_FRO = 4
+  PARAM_NORM = 5
+  PATH_NORM = 6
 
 class OptimizerType(Enum):
   SGD = 1
@@ -30,6 +34,11 @@ class Verbosity(IntEnum):
   RUN = 2
   EPOCH = 3
   BATCH = 4
+
+class LagrangianType(Enum):
+  NONE = 1
+  PENALTY = 2
+  AUGMENTED = 3
 
 @dataclass(frozen=False)
 class ETrainingState:
@@ -51,7 +60,11 @@ class EConfig:
   optimizer_type: OptimizerType = OptimizerType.SGD
   lr: float = 0.001
   complexity_type: ComplexityType = ComplexityType.NONE
-  complexity_lambda: float = 0
+  complexity_lambda: Optional[float] = None
+  # Constrained Optimization
+  lagrangian_type: LagrangianType = LagrangianType.NONE
+  lagrangian_start_epoch: Optional[int] = None
+  lagrangian_target: Optional[float] = None
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = 100
   save_epoch_freq: Optional[int] = 10
@@ -61,6 +74,14 @@ class EConfig:
   checkpoint_dir: Path = Path('checkpoints')
   resume_from_checkpoint: bool = False
   verbosity: Verbosity = Verbosity.NONE
+
+  # Validation
+  def __post_init__(self):
+    if self.lagrangian_type != LagrangianType.NONE:
+      if self.lagrangian_start_epoch is None:
+        raise KeyError
+      if self.lagrangian_target is None:
+        raise KeyError
 
   def to_tensorboard_dict(self) -> dict:
     d = asdict(self)
