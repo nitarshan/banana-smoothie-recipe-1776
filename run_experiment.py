@@ -32,9 +32,6 @@ def setup_paths(root_dir: str, experiment_id: int):
   checkpoint_path = root_path / 'checkpoints'
   checkpoint_path.mkdir(parents=True, exist_ok=True)
   print('[Experiment {}] Results path {}'.format(experiment_id, results_path))
-  print('[Experiment {}] Log path {}'.format(experiment_id, log_path))
-  print('[Experiment {}] Data path {}'.format(experiment_id, data_path))
-  print('[Experiment {}] Checkpoint path {}'.format(experiment_id, checkpoint_path))
   return results_path, log_path, data_path, checkpoint_path
 
 # Leverage multiprocessing to parallelize experiments
@@ -142,7 +139,7 @@ def single(
     checkpoint_dir=checkpoint_path,
     verbosity=Verbosity.EPOCH
   )
-  print(e_config)
+  print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
   acc, avg_loss, complexity_loss, correct = Experiment(e_state, device, e_config).train()
 

@@ -89,7 +89,13 @@ class EConfig:
     d["dataset_type"] = d["dataset_type"].name
     d["optimizer_type"] = d["optimizer_type"].name
     d["complexity_type"] = d["complexity_type"].name
-    #d["objective"] = d["objective"].name
+    d["lagrangian_type"] = d["lagrangian_type"].name
+    if d["complexity_lambda"] is None:
+      del d["complexity_lambda"]
+    if d["lagrangian_start_epoch"] is None:
+      del d["lagrangian_start_epoch"]
+    if d["lagrangian_target"] is None:
+      del d["lagrangian_target"]
     del d["log_batch_freq"]
     del d["save_epoch_freq"]
     del d["log_tensorboard"]
@@ -97,5 +103,6 @@ class EConfig:
     del d["log_dir"]
     del d["checkpoint_dir"]
     del d["resume_from_checkpoint"]
+    del d["verbosity"]
 
     return d

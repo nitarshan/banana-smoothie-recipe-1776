@@ -42,7 +42,7 @@ class ExperimentBaseModel(nn.Module):
     elif complexity_type == ComplexityType.PROD_OF_FRO:
       return prod_of_fro()
     elif complexity_type == ComplexityType.SUM_OF_FRO:
-      d = len(self.parameters())
+      d = len(list(self.parameters()))
       return d * prod_of_fro() ** (1/d)
     elif complexity_type == ComplexityType.PARAM_NORM:
       return param_norm()

@@ -53,7 +53,7 @@ class Experiment:
       torch.set_rng_state(torch_rng_state)
 
     if self.cfg.log_tensorboard:
-      log_file = self.cfg.log_dir / str(self.e_state.id) / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda)
+      log_file = self.cfg.log_dir / self.cfg.model_type.name / self.cfg.dataset_type.name / self.cfg.optimizer_type.name / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda) / str(self.e_state.id)
       self.writer = SummaryWriter(log_file)
       #self.writer.add_graph(self.model, self.train_loader.dataset[0][0])
 
@@ -83,9 +83,9 @@ class Experiment:
       self.optimizer.step()
 
       if self.cfg.log_tensorboard:
-        self.writer.add_scalar('train/empirical_risk', empirical_risk.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
-        self.writer.add_scalar('train/complexity', complexity.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
-        self.writer.add_scalar('train/loss', loss.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
+        self.writer.add_scalar('train_minibatch/empirical_risk', empirical_risk.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
+        self.writer.add_scalar('train_minibatch/{}_complexity'.format(self.cfg.complexity_type.name), complexity.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
+        self.writer.add_scalar('train_minibatch/loss', loss.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
 
       if self.cfg.verbosity >= Verbosity.BATCH and self.cfg.log_batch_freq is not None and batch_idx % self.cfg.log_batch_freq == 0:
         print('[{}] Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
@@ -141,8 +141,8 @@ class Experiment:
       print('[{}][Epoch {}][{:5} L: {:.4g}, C: {:.4g}, A: {:.0f}/{} ({:.2f}%)]'.format(
         self.e_state.id, self.e_state.epoch, dataset_subset_type.name, avg_loss, complexity_loss, num_correct, num_to_evaluate_on, 100. * acc))
     if verbose and self.cfg.log_tensorboard:
-      self.writer.add_scalar('val/acc', acc, self.e_state.epoch)
-      self.writer.add_scalar('val/loss', avg_loss, self.e_state.epoch)
+      self.writer.add_scalar('validation_epoch/{}/acc'.format(dataset_subset_type.name), acc, self.e_state.epoch)
+      self.writer.add_scalar('validation_epoch/{}/loss'.format(dataset_subset_type.name), avg_loss, self.e_state.epoch)
       if self.cfg.epochs == self.e_state.epoch:
         self.writer.add_hparams(self.cfg.to_tensorboard_dict(), {'hparam/accuracy': acc, 'hparam/loss': avg_loss})
     return acc, avg_loss, complexity_loss, correct
