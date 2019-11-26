@@ -105,6 +105,10 @@ def single(
   lagrangian_type: str = LagrangianType.NONE.name,
   lagrangian_target: Optional[float] = None,
   lagrangian_start_epoch: Optional[int] = None,
+  lagrangian_start_rho: Optional[float] = None,
+  lagrangian_tolerance: Optional[float] = None,
+  lagrangian_patience_batches: Optional[int] = None,
+  lagrangian_improvement_rate: Optional[float] = None,
   use_cuda: bool = True,
   log_tensorboard: bool = False,
   save_epoch_freq: Optional[int] = None,
@@ -117,7 +121,6 @@ def single(
   results_path, log_path, data_path, checkpoint_path = setup_paths(root_dir, experiment_id)
 
   seed = experiment_id % (2**32)
-  e_state = ETrainingState(id=experiment_id)
   e_config = EConfig(
     seed=seed,
     use_cuda=use_cuda,
@@ -132,16 +135,21 @@ def single(
     complexity_type=ComplexityType[complexity_type],
     complexity_lambda=complexity_lambda,
     lagrangian_type=LagrangianType[lagrangian_type],
-    lagrangian_target=lagrangian_target,
     lagrangian_start_epoch=lagrangian_start_epoch,
+    lagrangian_target=lagrangian_target,
+    lagrangian_tolerance=lagrangian_tolerance,
+    lagrangian_start_rho=lagrangian_start_rho,
+    lagrangian_patience_batches=lagrangian_patience_batches,
+    lagrangian_improvement_rate=lagrangian_improvement_rate,
     log_dir=log_path,
     data_dir=data_path,
     checkpoint_dir=checkpoint_path,
     verbosity=Verbosity.EPOCH
   )
+  e_state = ETrainingState(id=experiment_id, lagrangian_rho=e_config.lagrangian_start_rho)
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
-  acc, avg_loss, complexity_loss, correct = Experiment(e_state, device, e_config).train()
+  acc, avg_loss, complexity_loss, _, _ = Experiment(e_state, device, e_config).train()
 
   results = {
     'e_state': e_state,

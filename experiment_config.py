@@ -44,6 +44,8 @@ class LagrangianType(Enum):
 class ETrainingState:
   id: int
   epoch: int = 1
+  lagrangian_rho: Optional[float] = None
+  prev_constraint_val: Optional[float] = None
 
 # Configuration for the experiment
 @dataclass(frozen=True)
@@ -65,9 +67,14 @@ class EConfig:
   lagrangian_type: LagrangianType = LagrangianType.NONE
   lagrangian_start_epoch: Optional[int] = None
   lagrangian_target: Optional[float] = None
+  lagrangian_tolerance: Optional[float] = None
+  lagrangian_start_rho: Optional[float] = None
+  lagrangian_patience_batches: Optional[int] = None
+  lagrangian_improvement_rate: Optional[float] = None
   # Visibility (default no visibility)
-  log_batch_freq: Optional[int] = 100
-  save_epoch_freq: Optional[int] = 10
+  log_batch_freq: Optional[int] = None
+  log_epoch_freq: Optional[int] = 10
+  save_epoch_freq: Optional[int] = None
   log_tensorboard: bool = False
   data_dir: Path = Path('data')
   log_dir: Path = Path('logs')
@@ -81,6 +88,14 @@ class EConfig:
       if self.lagrangian_start_epoch is None:
         raise KeyError
       if self.lagrangian_target is None:
+        raise KeyError
+      if self.lagrangian_tolerance is None:
+        raise KeyError
+      if self.lagrangian_start_rho is None:
+        raise KeyError
+      if self.lagrangian_patience_batches is None:
+        raise KeyError
+      if self.lagrangian_improvement_rate is None:
         raise KeyError
 
   def to_tensorboard_dict(self) -> dict:
