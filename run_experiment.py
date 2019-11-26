@@ -109,6 +109,7 @@ def single(
   lagrangian_tolerance: Optional[float] = None,
   lagrangian_patience_batches: Optional[int] = None,
   lagrangian_improvement_rate: Optional[float] = None,
+  lagrangian_start_alpha: Optional[float] = None,
   use_cuda: bool = True,
   log_tensorboard: bool = False,
   save_epoch_freq: Optional[int] = None,
@@ -141,12 +142,17 @@ def single(
     lagrangian_start_rho=lagrangian_start_rho,
     lagrangian_patience_batches=lagrangian_patience_batches,
     lagrangian_improvement_rate=lagrangian_improvement_rate,
+    lagrangian_start_alpha=lagrangian_start_alpha,
     log_dir=log_path,
     data_dir=data_path,
     checkpoint_dir=checkpoint_path,
     verbosity=Verbosity.EPOCH
   )
-  e_state = ETrainingState(id=experiment_id, lagrangian_rho=e_config.lagrangian_start_rho)
+  e_state = ETrainingState(
+    id=experiment_id,
+    lagrangian_rho=e_config.lagrangian_start_rho,
+    lagrangian_alpha=e_config.lagrangian_start_alpha
+  )
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
   acc, avg_loss, complexity_loss, _, _ = Experiment(e_state, device, e_config).train()

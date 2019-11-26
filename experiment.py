@@ -75,8 +75,8 @@ class Experiment:
         constraint = torch.abs(complexity - self.cfg.lagrangian_target)
         if self.cfg.lagrangian_type == LagrangianType.PENALTY:
           loss += self.e_state.lagrangian_rho * constraint ** 2
-        if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
-          raise NotImplementedError
+        elif self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
+          loss += self.e_state.lagrangian_rho / 2 * constraint ** 2 + self.e_state.lagrangian_alpha * constraint
         
         if self.cfg.log_tensorboard:
           self.writer.add_scalar('train_minibatch/constraint_rho', self.e_state.lagrangian_rho, global_batch_idx)
@@ -91,6 +91,10 @@ class Experiment:
         # 1) The complexity measure is not within tolerance of the target
         # 2) The constraint term has not improved since we last ran this check
         if global_batch_idx % self.cfg.lagrangian_patience_batches == 0 and torch.abs(constraint) > self.cfg.lagrangian_tolerance:
+          if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
+            self.e_state.lagrangian_alpha += self.e_state.lagrangian_rho * constraint.item()
+            print('[{}][Epoch {} Batch {}] Increasing Lagrangian alpha to {:.2g}'.format(
+                self.e_state.id, self.e_state.epoch, batch_idx, self.e_state.lagrangian_alpha))
           if self.e_state.prev_constraint_val is not None and (constraint.item() > self.cfg.lagrangian_improvement_rate * self.e_state.prev_constraint_val):
             self.e_state.lagrangian_rho *= 10
             print('[{}][Epoch {} Batch {}] Increasing Lagrangian rho to {:.2g}'.format(
@@ -121,7 +125,7 @@ class Experiment:
         val_eval = self.evaluate(DatasetSubsetType.VAL)
         train_eval = self.evaluate(DatasetSubsetType.TRAIN)
         if self.cfg.verbosity >= Verbosity.EPOCH:
-          print('[{}][Epoch {}][Generalization L: {:.2g} E: {:.2f}pp][{} L: {:.4g}, C: {:.4g}, A: {:.0f}/{} ({:.2f}%)][{} L: {:.4g}, C: {:.4g}, A: {:.0f}/{} ({:.2f}%)]'.format(
+          print('[{}][Epoch {}][GEN L: {:.2g} E: {:.2f}pp][{} L: {:.4g}, C: {:.4g}, A: {:.0f}/{} ({:.2f}%)][{} L: {:.4g}, C: {:.4g}, A: {:.0f}/{} ({:.2f}%)]'.format(
             self.e_state.id, self.e_state.epoch,
             train_eval[1] - val_eval[1], 100. * (train_eval[0] - val_eval[0]),
             DatasetSubsetType.VAL.name, val_eval[1], val_eval[2], val_eval[3], val_eval[4], 100. * val_eval[0],

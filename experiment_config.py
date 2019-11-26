@@ -45,6 +45,7 @@ class ETrainingState:
   id: int
   epoch: int = 1
   lagrangian_rho: Optional[float] = None
+  lagrangian_alpha: Optional[float] = None
   prev_constraint_val: Optional[float] = None
 
 # Configuration for the experiment
@@ -71,6 +72,8 @@ class EConfig:
   lagrangian_start_rho: Optional[float] = None
   lagrangian_patience_batches: Optional[int] = None
   lagrangian_improvement_rate: Optional[float] = None
+  ## Augmented Lagrangian Terms
+  lagrangian_start_alpha: Optional[float] = None
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = None
   log_epoch_freq: Optional[int] = 10
@@ -96,6 +99,9 @@ class EConfig:
       if self.lagrangian_patience_batches is None:
         raise KeyError
       if self.lagrangian_improvement_rate is None:
+        raise KeyError
+    if self.lagrangian_type == LagrangianType.AUGMENTED:
+      if self.lagrangian_start_alpha is None:
         raise KeyError
 
   def to_tensorboard_dict(self) -> dict:
