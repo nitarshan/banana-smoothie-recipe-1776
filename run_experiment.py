@@ -105,11 +105,11 @@ def single(
   lagrangian_type: str = LagrangianType.NONE.name,
   lagrangian_target: Optional[float] = None,
   lagrangian_start_epoch: Optional[int] = None,
-  lagrangian_start_rho: Optional[float] = None,
+  lagrangian_start_mu: Optional[float] = None,
   lagrangian_tolerance: Optional[float] = None,
   lagrangian_patience_batches: Optional[int] = None,
   lagrangian_improvement_rate: Optional[float] = None,
-  lagrangian_start_alpha: Optional[float] = None,
+  lagrangian_start_lambda: Optional[float] = None,
   use_cuda: bool = True,
   log_tensorboard: bool = False,
   save_epoch_freq: Optional[int] = None,
@@ -139,10 +139,10 @@ def single(
     lagrangian_start_epoch=lagrangian_start_epoch,
     lagrangian_target=lagrangian_target,
     lagrangian_tolerance=lagrangian_tolerance,
-    lagrangian_start_rho=lagrangian_start_rho,
+    lagrangian_start_mu=lagrangian_start_mu,
     lagrangian_patience_batches=lagrangian_patience_batches,
     lagrangian_improvement_rate=lagrangian_improvement_rate,
-    lagrangian_start_alpha=lagrangian_start_alpha,
+    lagrangian_start_lambda=lagrangian_start_lambda,
     log_dir=log_path,
     data_dir=data_path,
     checkpoint_dir=checkpoint_path,
@@ -150,8 +150,8 @@ def single(
   )
   e_state = ETrainingState(
     id=experiment_id,
-    lagrangian_rho=e_config.lagrangian_start_rho,
-    lagrangian_alpha=e_config.lagrangian_start_alpha
+    lagrangian_mu=e_config.lagrangian_start_mu,
+    lagrangian_lambda=e_config.lagrangian_start_lambda
   )
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')

@@ -64,48 +64,73 @@ class Experiment:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       self.optimizer.zero_grad()
       output, complexity = self.model(data, self.cfg.complexity_type)
-      empirical_risk = self.risk_objective(output, target)
-      loss = empirical_risk
+      cross_entropy = self.risk_objective(output, target)
+      loss = cross_entropy
 
       if self.cfg.complexity_lambda is not None:
         loss += self.cfg.complexity_lambda * complexity
 
-      # Constrained Optimization
-      if self.cfg.lagrangian_type != LagrangianType.NONE and self.e_state.epoch >= self.cfg.lagrangian_start_epoch:
+      constraint = torch.zeros(1, device=data.device)
+      do_constraint_optimization = (
+        self.cfg.lagrangian_type != LagrangianType.NONE
+        and self.e_state.epoch >= self.cfg.lagrangian_start_epoch
+      )
+      if do_constraint_optimization:
         constraint = torch.abs(complexity - self.cfg.lagrangian_target)
         if self.cfg.lagrangian_type == LagrangianType.PENALTY:
-          loss += self.e_state.lagrangian_rho * constraint ** 2
+          loss += self.e_state.lagrangian_mu * constraint ** 2
         elif self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
-          loss += self.e_state.lagrangian_rho / 2 * constraint ** 2 + self.e_state.lagrangian_alpha * constraint
+          loss += self.e_state.lagrangian_mu / 2 * constraint ** 2 + self.e_state.lagrangian_lambda * constraint
         
         if self.cfg.log_tensorboard:
-          self.writer.add_scalar('train_minibatch/constraint_rho', self.e_state.lagrangian_rho, global_batch_idx)
+          self.writer.add_scalar('train_minibatch/constraint_mu', self.e_state.lagrangian_mu, global_batch_idx)
+          if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
+            self.writer.add_scalar('train_minibatch/constraint_lambda', self.e_state.lagrangian_lambda, global_batch_idx)
           self.writer.add_scalar('train_minibatch/constraint', constraint.item(), global_batch_idx)
 
       loss.backward()
       self.optimizer.step()
 
-      # Updating parameters of constrained optimization
-      if self.cfg.lagrangian_type != LagrangianType.NONE and self.e_state.epoch >= self.cfg.lagrangian_start_epoch:
-        # Possibly increase lagrangian term rho if both
-        # 1) The complexity measure is not within tolerance of the target
-        # 2) The constraint term has not improved since we last ran this check
-        if global_batch_idx % self.cfg.lagrangian_patience_batches == 0 and torch.abs(constraint) > self.cfg.lagrangian_tolerance:
-          if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
-            self.e_state.lagrangian_alpha += self.e_state.lagrangian_rho * constraint.item()
-            print('[{}][Epoch {} Batch {}] Increasing Lagrangian alpha to {:.2g}'.format(
-                self.e_state.id, self.e_state.epoch, batch_idx, self.e_state.lagrangian_alpha))
-          if self.e_state.prev_constraint_val is not None and (constraint.item() > self.cfg.lagrangian_improvement_rate * self.e_state.prev_constraint_val):
-            self.e_state.lagrangian_rho *= 10
+      update_constraint_optimization_parameters = (
+        do_constraint_optimization
+        and global_batch_idx % self.cfg.lagrangian_patience_batches == 0
+        and constraint > self.cfg.lagrangian_tolerance
+      )
+      if update_constraint_optimization_parameters:
+        loss_delta = loss - self.e_state.prev_loss
+
+        update_lagrangian_lambda = (
+          self.cfg.lagrangian_type == LagrangianType.AUGMENTED
+          and (
+            loss_delta > 0
+            or loss_delta < self.cfg.lagrangian_lambda_omega
+          )
+        )
+        if update_lagrangian_lambda:
+          self.e_state.lagrangian_lambda += self.e_state.lagrangian_mu * constraint.item()
+          print('[{}][Epoch {} Batch {}] Increasing Lagrangian alpha to {:.2g}'.format(
+              self.e_state.id, self.e_state.epoch, batch_idx, self.e_state.lagrangian_lambda))
+        
+        update_prev_constraint = (
+          self.cfg.lagrangian_type == LagrangianType.PENALTY
+          or update_lagrangian_lambda
+        )
+        if update_prev_constraint:
+          update_lagrangian_mu = (
+            self.e_state.prev_constraint is not None
+            and (constraint.item() > self.cfg.lagrangian_improvement_rate * self.e_state.prev_constraint)
+          )
+          if update_lagrangian_mu:
+            self.e_state.lagrangian_mu *= 10
             print('[{}][Epoch {} Batch {}] Increasing Lagrangian rho to {:.2g}'.format(
-              self.e_state.id, self.e_state.epoch, batch_idx, self.e_state.lagrangian_rho))
+              self.e_state.id, self.e_state.epoch, batch_idx, self.e_state.lagrangian_mu))
             # Reset the optimizer as we've changed the objective
             if self.cfg.optimizer_type == OptimizerType.ADAM:
               self.optimizer = optim.Adam(self.model.parameters(), lr=self.cfg.lr)
-          self.e_state.prev_constraint_val = constraint.item()
+          self.e_state.prev_constraint = constraint.item()
 
       if self.cfg.log_tensorboard:
-        self.writer.add_scalar('train_minibatch/empirical_risk', empirical_risk.item(), global_batch_idx)
+        self.writer.add_scalar('train_minibatch/cross_entropy', cross_entropy.item(), global_batch_idx)
         self.writer.add_scalar('train_minibatch/{}_complexity'.format(self.cfg.complexity_type.name), complexity.item(), global_batch_idx)
         self.writer.add_scalar('train_minibatch/loss', loss.item(), global_batch_idx)
 
