@@ -97,10 +97,15 @@ class Experiment:
         and constraint > self.cfg.lagrangian_tolerance
       )
       if update_constraint_optimization_parameters:
-        loss_delta = loss - self.e_state.prev_loss
+        if self.e_state.prev_loss is None:
+          loss_delta = None
+        else:
+          loss_delta = loss - self.e_state.prev_loss
+        self.e_state.prev_loss = loss.item()
 
         update_lagrangian_lambda = (
           self.cfg.lagrangian_type == LagrangianType.AUGMENTED
+          and loss_delta is not None
           and (
             loss_delta > 0
             or loss_delta < self.cfg.lagrangian_lambda_omega
