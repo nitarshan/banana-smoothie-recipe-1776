@@ -27,7 +27,8 @@ class ComplexityType(Enum):
 
 class OptimizerType(Enum):
   SGD = 1
-  ADAM = 2
+  SGD_MOMENTUM = 2
+  ADAM = 3
 
 class Verbosity(IntEnum):
   NONE = 1
@@ -106,6 +107,8 @@ class EConfig:
     if self.lagrangian_type == LagrangianType.AUGMENTED:
       if self.lagrangian_start_lambda is None:
         raise KeyError
+      if self.lagrangian_lambda_omega is None:
+        raise KeyError
 
   def to_tensorboard_dict(self) -> dict:
     d = asdict(self)
@@ -120,6 +123,18 @@ class EConfig:
       del d["lagrangian_start_epoch"]
     if d["lagrangian_target"] is None:
       del d["lagrangian_target"]
+    if d["lagrangian_tolerance"] is None:
+      del d["lagrangian_tolerance"]
+    if d["lagrangian_start_mu"] is None:
+      del d["lagrangian_start_mu"]
+    if d["lagrangian_patience_batches"] is None:
+      del d["lagrangian_patience_batches"]
+    if d["lagrangian_improvement_rate"] is None:
+      del d["lagrangian_improvement_rate"]
+    if d["lagrangian_start_lambda"] is None:
+      del d["lagrangian_start_lambda"]
+    if d["lagrangian_lambda_omega"] is None:
+      del d["lagrangian_lambda_omega"]
     del d["log_batch_freq"]
     del d["save_epoch_freq"]
     del d["log_tensorboard"]

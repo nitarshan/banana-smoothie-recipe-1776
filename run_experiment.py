@@ -26,7 +26,7 @@ def setup_paths(root_dir: str, experiment_id: int):
   root_path = Path(root_dir)
   results_path = root_path / 'results'
   results_path.mkdir(parents=True, exist_ok=True)
-  log_path = root_path / 'logs' / str(experiment_id)
+  log_path = root_path / 'logs'
   data_path = root_path / 'data'
   data_path.mkdir(parents=True, exist_ok=True)
   checkpoint_path = root_path / 'checkpoints'
@@ -164,8 +164,8 @@ def single(
     'e_config': e_config,
     'final_results': [complexity_lambda, acc, avg_loss, complexity_loss],
   }
-  with open(results_path / '{}.pkl'.format(experiment_id), mode='wb') as results_file:
-    pickle.dump(results, results_file)
+  #with open(results_path / '{}.pkl'.format(experiment_id), mode='wb') as results_file:
+  #  pickle.dump(results, results_file)
 
 if __name__ == '__main__':
   mp.set_start_method('spawn')

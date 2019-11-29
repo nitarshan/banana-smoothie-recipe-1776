@@ -35,6 +35,8 @@ class Experiment:
     # Optimizer
     if self.cfg.optimizer_type == OptimizerType.SGD:
       self.optimizer = optim.SGD(self.model.parameters(), lr=self.cfg.lr)
+    elif self.cfg.optimizer_type == OptimizerType.SGD_MOMENTUM:
+      self.optimizer = optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
     elif self.cfg.optimizer_type == OptimizerType.ADAM:
       self.optimizer = optim.Adam(self.model.parameters(), lr=self.cfg.lr)
     else:
@@ -76,7 +78,7 @@ class Experiment:
         and self.e_state.epoch >= self.cfg.lagrangian_start_epoch
       )
       if do_constraint_optimization:
-        constraint = torch.abs(complexity - self.cfg.lagrangian_target)
+        constraint = (complexity - self.cfg.lagrangian_target) ** 2
         if self.cfg.lagrangian_type == LagrangianType.PENALTY:
           loss += self.e_state.lagrangian_mu * constraint ** 2
         elif self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
@@ -130,7 +132,9 @@ class Experiment:
             print('[{}][Epoch {} Batch {}] Increasing Lagrangian rho to {:.2g}'.format(
               self.e_state.id, self.e_state.epoch, batch_idx, self.e_state.lagrangian_mu))
             # Reset the optimizer as we've changed the objective
-            if self.cfg.optimizer_type == OptimizerType.ADAM:
+            if self.cfg.optimizer_type == OptimizerType.SGD_MOMENTUM:
+              self.optimizer = optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
+            elif self.cfg.optimizer_type == OptimizerType.ADAM:
               self.optimizer = optim.Adam(self.model.parameters(), lr=self.cfg.lr)
           self.e_state.prev_constraint = constraint.item()
 
