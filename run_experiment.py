@@ -132,7 +132,7 @@ def single(
     optimizer_type=OptimizerType[optimizer_type],
     lr=lr,
     epochs=epochs,
-    save_epoch_freq = save_epoch_freq,
+    save_epoch_freq=save_epoch_freq,
     log_tensorboard=log_tensorboard,
     complexity_type=ComplexityType[complexity_type],
     complexity_lambda=complexity_lambda,
@@ -157,15 +157,16 @@ def single(
   )
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
-  acc, avg_loss, complexity_loss, _, _ = Experiment(e_state, device, e_config).train()
+  val_eval, train_eval = Experiment(e_state, device, e_config).train()
 
   results = {
     'e_state': e_state,
     'e_config': e_config,
-    'final_results': [complexity_lambda, acc, avg_loss, complexity_loss],
+    'final_results_val': val_eval,
+    'final_results_train': train_eval,
   }
-  #with open(results_path / '{}.pkl'.format(experiment_id), mode='wb') as results_file:
-  #  pickle.dump(results, results_file)
+  with open(results_path / '{}.pkl'.format(experiment_id), mode='wb') as results_file:
+    pickle.dump(results, results_file)
 
 if __name__ == '__main__':
   mp.set_start_method('spawn')

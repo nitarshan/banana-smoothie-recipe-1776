@@ -1,6 +1,6 @@
 import pathlib
 import time
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
@@ -9,7 +9,9 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
 from dataset_helpers import get_dataloaders
-from experiment_config import (EConfig, ETrainingState, LagrangianType, OptimizerType, Verbosity, DatasetSubsetType)
+from experiment_config import (
+  DatasetSubsetType, EConfig, ETrainingState, LagrangianType, OptimizerType,
+  Verbosity)
 from models import get_model_for_config
 
 class Experiment:
@@ -173,7 +175,7 @@ class Experiment:
     if self.cfg.log_tensorboard:
       self.writer.flush()
       self.writer.close()
-    return self.evaluate(DatasetSubsetType.VAL, verbose=False)
+    return self.evaluate(DatasetSubsetType.VAL, verbose=False), self.evaluate(DatasetSubsetType.TRAIN, verbose=False)
 
   @torch.no_grad()
   def evaluate(self, dataset_subset_type: DatasetSubsetType, verbose=True):
@@ -216,7 +218,7 @@ class Experiment:
       'torch_rng': torch.get_rng_state(),
     }, checkpoint_file)
 
-  def load_state(self) -> (EConfig, dict, dict, np.ndarray, torch.ByteTensor):
+  def load_state(self) -> Tuple[EConfig, dict, dict, np.ndarray, torch.ByteTensor]:
     checkpoint_file = self.cfg.checkpoint_dir / str(self.e_state.id) / (str(self.e_state.epoch - 1) + '.pt')
     checkpoint = torch.load(checkpoint_file)
     return checkpoint['config'], checkpoint['model'], checkpoint['optimizer'], checkpoint['np_rng'], checkpoint['torch_rng']

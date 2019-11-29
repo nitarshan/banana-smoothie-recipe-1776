@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-#SBATCH --partition=long
-#SBATCH --job-name=test
+#SBATCH --partition=unkillable
+#SBATCH --job-name=complexity_lambda_search
 #SBATCH --cpus-per-task=4
-#SBATCH --gres=gpu:titanxp:1
+#SBATCH --gres=gpu:titanrtx:1
 #SBATCH --mem=20G
-#SBATCH --time=10:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output /network/tmp1/rajkuman/slurm-%j.out
 #SBATCH --error /network/tmp1/rajkuman/slurm-error-%j.out
 
@@ -17,6 +17,7 @@ conda activate ccm
 
 # 2. Prepare directories and copy dataset onto the compute node
 mkdir -p /network/tmp1/rajkuman/logs
+mkdir -p /network/tmp1/rajkuman/results
 mkdir -p $SLURM_TMPDIR/data/MNIST/
 mkdir $SLURM_TMPDIR/logs
 mkdir $SLURM_TMPDIR/checkpoints
@@ -29,7 +30,7 @@ model='DEEP'
 dataset='MNIST'
 optimizer='SGD_MOMENTUM'
 measures='L2 PROD_OF_FRO SUM_OF_FRO PARAM_NORM PATH_NORM'
-lambdas='0 0.1 0.2 0.3 0.4 0.5'
+lambdas='0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0'
 runs=3
 global_idx=0
 for measure in $measures; do
@@ -52,6 +53,7 @@ for measure in $measures; do
       done
       wait
       rsync -r $SLURM_TMPDIR/logs/ /network/tmp1/rajkuman/logs
+      rsync -r $SLURM_TMPDIR/results/ /network/tmp1/rajkuman/results
     fi
   done
 done
