@@ -57,7 +57,7 @@ class Experiment:
       torch.set_rng_state(torch_rng_state)
 
     if self.cfg.log_tensorboard:
-      log_file = self.cfg.log_dir / self.cfg.model_type.name / self.cfg.dataset_type.name / self.cfg.optimizer_type.name / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda) / str(self.e_state.id)
+      log_file = self.cfg.log_dir / self.cfg.model_type.name / self.cfg.dataset_type.name / self.cfg.optimizer_type.name / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda) / str(self.cfg.complexity_normalization) / str(self.e_state.id)
       self.writer = SummaryWriter(log_file)
       #self.writer.add_graph(self.model, self.train_loader.dataset[0][0])
 
@@ -72,6 +72,8 @@ class Experiment:
       loss = cross_entropy
 
       if self.cfg.complexity_lambda is not None:
+        if self.cfg.complexity_normalization:
+          complexity = complexity * (loss.detach() / complexity.detach())
         loss += self.cfg.complexity_lambda * complexity
 
       constraint = torch.zeros(1, device=data.device)
@@ -112,7 +114,7 @@ class Experiment:
           and loss_delta is not None
           and (
             loss_delta > 0
-            or loss_delta < self.cfg.lagrangian_lambda_omega
+            or torch.abs(loss_delta) < self.cfg.lagrangian_lambda_omega
           )
         )
         if update_lagrangian_lambda:

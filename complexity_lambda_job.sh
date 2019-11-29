@@ -48,6 +48,7 @@ for measure in $measures; do
         --batch_size=100 \
         --complexity_type=$measure \
         --complexity_lambda=$lambda \
+        --complexity_normalization \
         --use_cuda \
         --log_tensorboard &
       done
@@ -60,3 +61,4 @@ done
 
 # 4. To do on your local machine (not login)
 # rsync -a --ignore-existing mila:/network/tmp1/rajkuman/logs/ ./logs
+# rsync -a --ignore-existing mila:/network/tmp1/rajkuman/results/ ./results

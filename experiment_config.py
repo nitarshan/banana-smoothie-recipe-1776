@@ -67,6 +67,7 @@ class EConfig:
   lr: float = 0.001
   complexity_type: ComplexityType = ComplexityType.NONE
   complexity_lambda: Optional[float] = None
+  complexity_normalization: bool = False
   # Constrained Optimization
   lagrangian_type: LagrangianType = LagrangianType.NONE
   lagrangian_start_epoch: Optional[int] = None
