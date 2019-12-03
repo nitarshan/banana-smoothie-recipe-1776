@@ -80,7 +80,7 @@ class EConfig:
   lagrangian_start_lambda: Optional[float] = None
   lagrangian_lambda_omega: Optional[float] = None
   # Visibility (default no visibility)
-  log_batch_freq: Optional[int] = None
+  log_batch_freq: Optional[int] = 100
   log_epoch_freq: Optional[int] = 10
   save_epoch_freq: Optional[int] = None
   log_tensorboard: bool = False

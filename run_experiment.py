@@ -114,6 +114,7 @@ def single(
   lagrangian_lambda_omega: Optional[float] = None,
   use_cuda: bool = True,
   log_tensorboard: bool = False,
+  logger: Optional[object] = None,
   save_epoch_freq: Optional[int] = None,
 ) -> None:
   experiment_id = time.time_ns()
@@ -159,7 +160,7 @@ def single(
   )
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
-  val_eval, train_eval = Experiment(e_state, device, e_config).train()
+  val_eval, train_eval = Experiment(e_state, device, e_config, logger).train()
 
   results = {
     'e_state': e_state,
