@@ -12,13 +12,13 @@ from dataset_helpers import get_dataloaders
 from experiment_config import (
   DatasetSubsetType, EConfig, ETrainingState, LagrangianType, OptimizerType,
   Verbosity)
-from logs import DefaultLogger
+from logs import BaseLogger, DefaultLogger
 from models import get_model_for_config
 
 
 class Experiment:
   def __init__(self, e_state:ETrainingState, device: torch.device, e_config: Optional[EConfig]=None,
-               logger: Optional[object]=None):
+               logger: Optional[BaseLogger]=None):
     self.e_state = e_state
     self.device = device
     resume_from_checkpoint = (e_config is None) or e_config.resume_from_checkpoint
@@ -38,8 +38,6 @@ class Experiment:
       log_file = self.cfg.log_dir / self.cfg.model_type.name / self.cfg.dataset_type.name / self.cfg.optimizer_type.name / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda) / str(self.cfg.complexity_normalization) / str(self.e_state.id)
       self.logger = DefaultLogger(log_file)
     else:
-      assert hasattr(logger, "log_metrics")
-      assert hasattr(logger, "log_hparams")
       self.logger = logger
 
     # Model
@@ -149,13 +147,17 @@ class Experiment:
 
       # Log everything
       if global_batch_idx % self.cfg.log_batch_freq == 0:
-        self.logger.log_metrics(step=global_batch_idx,
-                                metrics={'train_minibatch/cross_entropy': cross_entropy.item(),
-                                         'train_minibatch/{}_complexity'.format(self.cfg.complexity_type.name): complexity.item(),
-                                         'train_minibatch/loss': loss.item(),
-                                         'train_minibatch/constraint_lambda': self.e_state.lagrangian_lambda,
-                                         'train_minibatch/constraint_mu': self.e_state.lagrangian_mu,
-                                         'train_minibatch/constraint': constraint.item()})
+        # Collect metrics for logging
+        metrics={'train_minibatch/cross_entropy': cross_entropy.item(),
+                 'train_minibatch/{}_complexity'.format(self.cfg.complexity_type.name): complexity.item(),
+                 'train_minibatch/loss': loss.item()}
+        if self.cfg.lagrangian_type != LagrangianType.NONE:
+          metrics.update({'train_minibatch/constraint_mu': self.e_state.lagrangian_mu})
+          if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
+            metrics.update({'train_minibatch/constraint_lambda': self.e_state.lagrangian_lambda,
+                            'train_minibatch/constraint': constraint.item()})
+          # Send metrics to logger
+          self.logger.log_metrics(step=global_batch_idx, metrics=metrics)
 
   def train(self):
     if self.cfg.verbosity >= Verbosity.RUN:
