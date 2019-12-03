@@ -156,8 +156,8 @@ class Experiment:
           if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
             metrics.update({'train_minibatch/constraint_lambda': self.e_state.lagrangian_lambda,
                             'train_minibatch/constraint': constraint.item()})
-          # Send metrics to logger
-          self.logger.log_metrics(step=global_batch_idx, metrics=metrics)
+        # Send metrics to logger
+        self.logger.log_metrics(step=global_batch_idx, metrics=metrics)
 
   def train(self):
     if self.cfg.verbosity >= Verbosity.RUN:
