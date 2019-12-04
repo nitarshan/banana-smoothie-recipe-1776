@@ -1,18 +1,16 @@
-import pathlib
 import time
-from functools import partial
-from typing import Callable, Optional, Tuple
+from typing import Optional, Tuple
 
+from comet_ml import Experiment as CometExperiment
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torch.optim as optim
 
 from dataset_helpers import get_dataloaders
 from experiment_config import (
   DatasetSubsetType, EConfig, ETrainingState, LagrangianType, OptimizerType,
   Verbosity)
-from logs import BaseLogger, DefaultLogger
+from logs import BaseLogger, DefaultLogger, Printer
 from models import get_model_for_config
 
 
@@ -39,6 +37,8 @@ class Experiment:
       self.logger = DefaultLogger(log_file)
     else:
       self.logger = logger
+    # Printing
+    self.printer = Printer(self.e_state.id, self.cfg.verbosity)
 
     # Model
     self.model = get_model_for_config(self.cfg)
@@ -46,11 +46,11 @@ class Experiment:
 
     # Optimizer
     if self.cfg.optimizer_type == OptimizerType.SGD:
-      self.optimizer = optim.SGD(self.model.parameters(), lr=self.cfg.lr)
+      self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr)
     elif self.cfg.optimizer_type == OptimizerType.SGD_MOMENTUM:
-      self.optimizer = optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
+      self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
     elif self.cfg.optimizer_type == OptimizerType.ADAM:
-      self.optimizer = optim.Adam(self.model.parameters(), lr=self.cfg.lr)
+      self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.cfg.lr)
     else:
       raise KeyError
 
@@ -77,8 +77,6 @@ class Experiment:
       loss = cross_entropy
 
       if self.cfg.complexity_lambda is not None:
-        if self.cfg.complexity_normalization:
-          complexity = complexity * (loss.detach() / complexity.detach())
         loss += self.cfg.complexity_lambda * complexity
 
       constraint = torch.zeros(1, device=data.device)
@@ -136,9 +134,9 @@ class Experiment:
               self.e_state.id, self.e_state.epoch, batch_idx, self.e_state.lagrangian_mu))
             # Reset the optimizer as we've changed the objective
             if self.cfg.optimizer_type == OptimizerType.SGD_MOMENTUM:
-              self.optimizer = optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
+              self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
             elif self.cfg.optimizer_type == OptimizerType.ADAM:
-              self.optimizer = optim.Adam(self.model.parameters(), lr=self.cfg.lr)
+              self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.cfg.lr)
           self.e_state.prev_constraint = constraint.item()
 
       if self.cfg.verbosity >= Verbosity.BATCH and self.cfg.log_batch_freq is not None and batch_idx % self.cfg.log_batch_freq == 0:
@@ -146,16 +144,16 @@ class Experiment:
           self.e_state.id, self.e_state.epoch, batch_idx * len(data), len(self.train_loader.dataset), 100. * batch_idx / len(self.train_loader), loss.item()))
 
       # Log everything
-      if global_batch_idx % self.cfg.log_batch_freq == 0:
+      if self.cfg.log_batch_freq is not None and global_batch_idx % self.cfg.log_batch_freq == 0:
         # Collect metrics for logging
-        metrics={'train_minibatch/cross_entropy': cross_entropy.item(),
-                 'train_minibatch/{}_complexity'.format(self.cfg.complexity_type.name): complexity.item(),
-                 'train_minibatch/loss': loss.item()}
+        metrics={'cross_entropy/train_minibatch': cross_entropy.item(),
+                 'complexity/{}/train_minibatch'.format(self.cfg.complexity_type.name): complexity.item(),
+                 'loss/train_minibatch': loss.item()}
         if self.cfg.lagrangian_type != LagrangianType.NONE:
-          metrics.update({'train_minibatch/constraint_mu': self.e_state.lagrangian_mu})
+          metrics.update({'constraint_mu/train_minibatch': self.e_state.lagrangian_mu})
           if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
-            metrics.update({'train_minibatch/constraint_lambda': self.e_state.lagrangian_lambda,
-                            'train_minibatch/constraint': constraint.item()})
+            metrics.update({'constraint_lambda/train_minibatch': self.e_state.lagrangian_lambda,
+                            'constraint/train_minibatch': constraint.item()})
         # Send metrics to logger
         self.logger.log_metrics(step=global_batch_idx, metrics=metrics)
 
@@ -163,29 +161,35 @@ class Experiment:
     if self.cfg.verbosity >= Verbosity.RUN:
       start_time = time.time()
       print('[{}] Training starting using {}'.format(self.e_state.id, self.device))
-    
+        
     for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
       self.e_state.epoch = epoch
       self._train_epoch()
-      if epoch % self.cfg.log_epoch_freq == 0:
+
+      if epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0:
         val_eval = self.evaluate(DatasetSubsetType.VAL)
         train_eval = self.evaluate(DatasetSubsetType.TRAIN)
-        if self.cfg.verbosity >= Verbosity.EPOCH:
-          print('[{}][Epoch {}][GEN L: {:.2g} E: {:.2f}pp][{} L: {:.4g}, C: {:.4g}, A: {:.0f}/{} ({:.2f}%)][{} L: {:.4g}, C: {:.4g}, A: {:.0f}/{} ({:.2f}%)]'.format(
-            self.e_state.id, self.e_state.epoch,
-            train_eval[1] - val_eval[1], 100. * (train_eval[0] - val_eval[0]),
-            DatasetSubsetType.VAL.name, val_eval[1], val_eval[2], val_eval[3], val_eval[4], 100. * val_eval[0],
-            DatasetSubsetType.TRAIN.name, train_eval[1], train_eval[2], train_eval[3], train_eval[4], 100. * train_eval[0]))
+
+        self.logger.log_metrics(
+          self.e_state.epoch,
+          {
+            'generalization/error': train_eval[0] - val_eval[0],
+            'generalization/loss': train_eval[1] - val_eval[1],
+          })
+        
+        self.printer.epoch_metrics(self.e_state.epoch, train_eval, val_eval)
+
       if self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0:
         self.save_state()
 
     if self.cfg.verbosity >= Verbosity.RUN:
       print('[{}] Training complete in {}s'.format(self.e_state.id, time.time() - start_time))
 
-    return self.evaluate(DatasetSubsetType.VAL, verbose=False), self.evaluate(DatasetSubsetType.TRAIN, verbose=False)
+    del self.logger
+    return val_eval, train_eval
 
   @torch.no_grad()
-  def evaluate(self, dataset_subset_type: DatasetSubsetType, verbose=True):
+  def evaluate(self, dataset_subset_type: DatasetSubsetType):
     self.model.eval()
     total_loss = 0
     num_correct = 0
@@ -207,12 +211,21 @@ class Experiment:
     complexity_loss = sum(complexities).item() / len(complexities)
     acc = num_correct / num_to_evaluate_on
 
-    self.logger.log_metrics(self.e_state.epoch,
-                            {'validation_epoch/{}/acc'.format(dataset_subset_type.name): acc.item(),
-                             'validation_epoch/{}/loss'.format(dataset_subset_type.name): avg_loss})
+    self.logger.log_metrics(
+      self.e_state.epoch,
+      {
+        'complexity/{}/{}'.format(self.cfg.complexity_type.name, dataset_subset_type.name): complexity_loss,
+        'cross_entropy/{}'.format(dataset_subset_type.name): avg_loss,
+        'accuracy/{}'.format(dataset_subset_type.name): acc.item(),
+      })
     if self.cfg.epochs == self.e_state.epoch:
-      self.logger.log_hparams(self.cfg.to_tensorboard_dict(), {'hparam/accuracy': acc.item(),
-                                                               'hparam/loss': avg_loss})
+      self.logger.log_hparams(
+        self.cfg.to_tensorboard_dict(),
+        {
+          'hparam/complexity': complexity_loss,
+          'hparam/accuracy': acc.item(),
+          'hparam/loss': avg_loss
+        })
 
     return acc, avg_loss, complexity_loss, num_correct, num_to_evaluate_on
 

@@ -67,7 +67,6 @@ class EConfig:
   lr: float = 0.001
   complexity_type: ComplexityType = ComplexityType.NONE
   complexity_lambda: Optional[float] = None
-  complexity_normalization: bool = False
   # Constrained Optimization
   lagrangian_type: LagrangianType = LagrangianType.NONE
   lagrangian_start_epoch: Optional[int] = None
@@ -83,7 +82,6 @@ class EConfig:
   log_batch_freq: Optional[int] = 100
   log_epoch_freq: Optional[int] = 10
   save_epoch_freq: Optional[int] = None
-  log_tensorboard: bool = False
   data_dir: Path = Path('data')
   log_dir: Path = Path('logs')
   checkpoint_dir: Path = Path('checkpoints')
@@ -138,7 +136,6 @@ class EConfig:
       del d["lagrangian_lambda_omega"]
     del d["log_batch_freq"]
     del d["save_epoch_freq"]
-    del d["log_tensorboard"]
     del d["data_dir"]
     del d["log_dir"]
     del d["checkpoint_dir"]

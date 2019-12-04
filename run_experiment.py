@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+from logs import CometLogger
 from pathlib import Path
 import time
 from typing import List, Optional
 import pickle
+import os
 
+from comet_ml import Experiment as CometExperiment
 import fire
 import numpy as np
 import pandas as pd
@@ -62,7 +65,6 @@ def multi(
         batch_size=128,
         epochs=10,
         save_epoch_freq = 50,
-        log_tensorboard=True,
         complexity_type=ComplexityType.L2,
         complexity_lambda=complexity_lambda,
         log_dir=log_path,
@@ -102,7 +104,6 @@ def single(
   batch_size: int,
   complexity_type: str,
   complexity_lambda: Optional[float],
-  complexity_normalization: bool = False,
   lagrangian_type: str = LagrangianType.NONE.name,
   lagrangian_target: Optional[float] = None,
   lagrangian_start_epoch: Optional[int] = None,
@@ -113,7 +114,7 @@ def single(
   lagrangian_start_lambda: Optional[float] = None,
   lagrangian_lambda_omega: Optional[float] = None,
   use_cuda: bool = True,
-  log_tensorboard: bool = False,
+  comet_api_key: Optional[str] = None,
   logger: Optional[object] = None,
   save_epoch_freq: Optional[int] = None,
 ) -> None:
@@ -135,10 +136,8 @@ def single(
     lr=lr,
     epochs=epochs,
     save_epoch_freq=save_epoch_freq,
-    log_tensorboard=log_tensorboard,
     complexity_type=ComplexityType[complexity_type],
     complexity_lambda=complexity_lambda,
-    complexity_normalization=complexity_normalization,
     lagrangian_type=LagrangianType[lagrangian_type],
     lagrangian_start_epoch=lagrangian_start_epoch,
     lagrangian_target=lagrangian_target,
@@ -160,6 +159,8 @@ def single(
   )
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
+  if logger is None and comet_api_key is not None:
+    logger = CometLogger(comet_api_key)
   val_eval, train_eval = Experiment(e_state, device, e_config, logger).train()
 
   results = {
