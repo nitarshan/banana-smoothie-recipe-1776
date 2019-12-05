@@ -48,7 +48,8 @@ for measure in $measures; do
       --complexity_type=$measure \
       --complexity_lambda=$lambda \
       --comet_api_key=$COMET_API_KEY \
-      --use_cuda 
+      --comet_tag='complexity_lambda' \
+      --use_cuda &
     done
     wait
     rsync -r $SLURM_TMPDIR/results/ /network/tmp1/rajkuman/results

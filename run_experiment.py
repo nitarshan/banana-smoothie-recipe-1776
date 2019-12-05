@@ -115,6 +115,7 @@ def single(
   lagrangian_lambda_omega: Optional[float] = None,
   use_cuda: bool = True,
   comet_api_key: Optional[str] = None,
+  comet_tag: Optional[str] = None,
   logger: Optional[object] = None,
   save_epoch_freq: Optional[int] = None,
 ) -> None:
@@ -160,7 +161,7 @@ def single(
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
   if logger is None and comet_api_key is not None:
-    logger = CometLogger(comet_api_key)
+    logger = CometLogger(comet_api_key, comet_tag)
   val_eval, train_eval = Experiment(e_state, device, e_config, logger).train()
 
   results = {

@@ -158,9 +158,7 @@ class Experiment:
         self.logger.log_metrics(step=global_batch_idx, metrics=metrics)
 
   def train(self):
-    if self.cfg.verbosity >= Verbosity.RUN:
-      start_time = time.time()
-      print('[{}] Training starting using {}'.format(self.e_state.id, self.device))
+    self.printer.train_start(self.device)
         
     for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
       self.e_state.epoch = epoch
@@ -182,8 +180,7 @@ class Experiment:
       if self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0:
         self.save_state()
 
-    if self.cfg.verbosity >= Verbosity.RUN:
-      print('[{}] Training complete in {}s'.format(self.e_state.id, time.time() - start_time))
+    self.printer.train_end()
 
     del self.logger
     return val_eval, train_eval
