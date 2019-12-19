@@ -1,7 +1,8 @@
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Optional
+from typing import Deque, Optional
+from collections import deque
 
 class DatasetType(Enum):
   MNIST = 1
@@ -34,7 +35,8 @@ class Verbosity(IntEnum):
   NONE = 1
   RUN = 2
   EPOCH = 3
-  BATCH = 4
+  LAGRANGIAN = 4
+  BATCH = 5
 
 class LagrangianType(Enum):
   NONE = 1
@@ -45,11 +47,14 @@ class LagrangianType(Enum):
 class ETrainingState:
   id: int
   epoch: int = 1
+  batch: int = 1
+  global_batch: int = 1
   lagrangian_mu: Optional[float] = None
   lagrangian_lambda: Optional[float] = None
   prev_loss: Optional[float] = None
   prev_acc: Optional[float] = None
   prev_constraint: Optional[float] = None
+  cross_entropy_hist: Deque[float] = deque([])
 
 # Configuration for the experiment
 @dataclass(frozen=True)

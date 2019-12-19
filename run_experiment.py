@@ -1,28 +1,18 @@
 #!/usr/bin/env python3
-from logs import CometLogger
 from pathlib import Path
-import time
-from typing import List, Optional
 import pickle
-import os
+import time
+from typing import Optional
+from collections import deque
 
-from comet_ml import Experiment as CometExperiment
+from logs import CometLogger
 import fire
-import numpy as np
-import pandas as pd
-import seaborn as sns
 import torch
-from torch import multiprocessing as mp
 
 from experiment import Experiment
 from experiment_config import (
-  ComplexityType, DatasetType, EConfig, ETrainingState, LagrangianType, ModelType, OptimizerType, Verbosity)
-
-# Has to be top-level fn, in order to be pickled by mp.Pool
-def _train_process(x: ETrainingState, y: EConfig):
-  sns.set()
-  device = torch.device('cuda' if y.use_cuda else 'cpu', ((mp.current_process()._identity[0]-1) % torch.cuda.device_count()) if y.use_cuda else 0)
-  return Experiment(x, device, y).train()
+  ComplexityType, DatasetType, EConfig, ETrainingState, LagrangianType,
+  ModelType, OptimizerType, Verbosity)
 
 def setup_paths(root_dir: str, experiment_id: int):
   print('[Experiment {}] Setting up directories'.format(experiment_id))
@@ -36,62 +26,6 @@ def setup_paths(root_dir: str, experiment_id: int):
   checkpoint_path.mkdir(parents=True, exist_ok=True)
   print('[Experiment {}] Results path {}'.format(experiment_id, results_path))
   return results_path, log_path, data_path, checkpoint_path
-
-# Leverage multiprocessing to parallelize experiments
-def multi(
-  root_dir: str,
-  runs: int = 3,
-  complexities: List[float] = [0, 0.05, 0.1],
-  use_cuda: bool = False
-) -> None:
-  experiment_id = time.time_ns()
-  print('[Experiment {}]'.format(experiment_id))
-  print("[Experiment {}] CPU cores:".format(experiment_id), mp.cpu_count())
-  print("[Experiment {}] CUDA devices:".format(experiment_id), torch.cuda.device_count())
-
-  results_path, log_path, data_path, checkpoint_path = setup_paths(root_dir, experiment_id)
-
-  args_queue = []
-  for complexity_lambda in complexities:
-    for _ in range(runs):
-      id = time.time_ns()
-      seed = id % (2**32)
-      e_state = ETrainingState(id=id)
-      e_config = EConfig(
-        seed=seed,
-        use_cuda=use_cuda,
-        model_type= ModelType.DEEP,
-        dataset_type=DatasetType.MNIST,
-        batch_size=128,
-        epochs=10,
-        save_epoch_freq = 50,
-        complexity_type=ComplexityType.L2,
-        complexity_lambda=complexity_lambda,
-        log_dir=log_path,
-        data_dir=data_path,
-        verbosity=Verbosity.EPOCH
-      )
-      args_queue.append((e_state, e_config))
-
-  if use_cuda:
-    results = [_train_process(x, y) for x, y in args_queue]
-  else:
-    print('[Experiment {}] Parallel Experiment Threads {}'.format(experiment_id, mp.cpu_count()))
-    with mp.Pool(mp.cpu_count()) as pool:
-      results = pool.starmap(_train_process, args_queue)
-
-  results = [(cfg[1].complexity_lambda, r[0], r[1], r[2]) for cfg, r in zip(args_queue, results)]
-  results = np.array(results)
-  results = pd.DataFrame(results, columns=['lambda', 'val_acc', 'val_risk', 'complexity'])
-  results.to_pickle(results_path / '{}.pkl'.format(experiment_id))
-  fig = sns.lineplot(x='lambda', y='val_acc', data=results).set_title('L2 Lambda vs Accuracy')
-  writer.add_figure('{}/lambda_vs_acc'.format(experiment_id), fig.get_figure(), 1, True)
-  fig = sns.lineplot(x='lambda', y='val_risk', data=results).set_title('L2 Lambda vs Empirical Risk')
-  writer.add_figure('{}/lambda_vs_risk'.format(experiment_id), fig.get_figure(), 1, True)
-  fig = sns.lineplot(x='lambda', y='complexity', data=results).set_title('L2 Lambda vs Complexity')
-  writer.add_figure('{}/lambda_vs_complexity'.format(experiment_id), fig.get_figure(), 1, True)
-  writer.flush()
-  writer.close()
 
 # Run a single
 def single(
@@ -121,7 +55,6 @@ def single(
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
-  print("[Experiment {}] CPU cores:".format(experiment_id), mp.cpu_count())
   print("[Experiment {}] CUDA devices:".format(experiment_id), torch.cuda.device_count())
 
   results_path, log_path, data_path, checkpoint_path = setup_paths(root_dir, experiment_id)
@@ -151,17 +84,18 @@ def single(
     log_dir=log_path,
     data_dir=data_path,
     checkpoint_dir=checkpoint_path,
-    verbosity=Verbosity.EPOCH
+    verbosity=Verbosity.LAGRANGIAN
   )
   e_state = ETrainingState(
     id=experiment_id,
     lagrangian_mu=e_config.lagrangian_start_mu,
-    lagrangian_lambda=e_config.lagrangian_start_lambda
+    lagrangian_lambda=e_config.lagrangian_start_lambda,
+    cross_entropy_hist=deque([], lagrangian_patience_batches or 1)
   )
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
   if logger is None and comet_api_key is not None:
-    logger = CometLogger(comet_api_key, comet_tag)
+    logger = CometLogger(comet_api_key, comet_tag, e_config.to_tensorboard_dict())
   val_eval, train_eval = Experiment(e_state, device, e_config, logger).train()
 
   results = {
@@ -174,7 +108,6 @@ def single(
     pickle.dump(results, results_file)
 
 if __name__ == '__main__':
-  mp.set_start_method('spawn')
   try:
     fire.Fire()
   except KeyboardInterrupt:

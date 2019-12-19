@@ -34,6 +34,7 @@ targets=(19.73 8096.64 26.50 381.56 45.56) # See complexity_lambda_analysis.ipyn
 runs=3
 global_idx=0
 count=-1
+jobs_per_gpu=4
 for measure in $measures; do
   let "count++"
   for ((i=1;i<=runs;i++)); do
@@ -48,7 +49,7 @@ for measure in $measures; do
     --batch_size=100 \
     --complexity_type=$measure \
     --complexity_lambda=None \
-    --lagrangian_type='PENALTY' \
+    --lagrangian_type='AUGMENTED' \
     --lagrangian_target=${targets[count]} \
     --lagrangian_start_epoch=0 \
     --lagrangian_start_mu=1e-6 \
@@ -58,12 +59,16 @@ for measure in $measures; do
     --lagrangian_start_lambda=0 \
     --lagrangian_lambda_omega=1e-3 \
     --comet_api_key=$COMET_API_KEY \
-    --comet_tag='verify_lagrangian' \
+    --comet_tag='verify_lagrangian_augmented' \
     --use_cuda &
+    if (( $global_idx % $jobs_per_gpu == 0 )); then
+      wait
+      rsync -r $SLURM_TMPDIR/results/ /network/tmp1/rajkuman/results
+    fi
   done
-  wait
-  rsync -r $SLURM_TMPDIR/results/ /network/tmp1/rajkuman/results
 done
+wait
+rsync -r $SLURM_TMPDIR/results/ /network/tmp1/rajkuman/results
 
 # 4. To do on your local machine (not login)
 # mkdir -p results/verify_lagrangian
