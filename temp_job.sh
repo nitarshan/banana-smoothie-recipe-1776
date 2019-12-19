@@ -29,8 +29,8 @@ python run_experiment.py single \
 --batch_size=100 \
 --complexity_type='L2' \
 --complexity_lambda=None \
---lagrangian_type='PENALTY' \
---lagrangian_target=100 \
+--lagrangian_type='AUGMENTED' \
+--lagrangian_target=30 \
 --lagrangian_start_epoch=0 \
 --lagrangian_start_mu=1e-6 \
 --lagrangian_tolerance=1e-3 \

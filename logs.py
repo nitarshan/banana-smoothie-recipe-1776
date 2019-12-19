@@ -2,6 +2,7 @@ import time
 from typing import Optional
 
 from comet_ml import Experiment as CometExperiment
+import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
