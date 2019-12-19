@@ -119,30 +119,21 @@ class Experiment:
       and abs_constraint > self.cfg.lagrangian_tolerance
     )
     if update_constraint_optimization_parameters:
+      # Check difference from last average of running loss
       loss_delta = None
       if self.e_state.prev_loss is not None:
         loss_delta = np.mean(self.e_state.cross_entropy_hist) - self.e_state.prev_loss
         self.logger.log_metrics(self.e_state.global_batch, {"loss_delta_always": loss_delta.item()})
-      self.e_state.prev_loss = np.mean(self.e_state.cross_entropy_hist) #loss.item()
+      self.e_state.prev_loss = np.mean(self.e_state.cross_entropy_hist)
 
-      update_lagrangian_lambda = (
-        self.cfg.lagrangian_type == LagrangianType.AUGMENTED
-        and loss_delta is not None
+      subproblem_converged = (
+        loss_delta is not None
         and (
           loss_delta > 0
-          or torch.abs(loss_delta) < self.cfg.lagrangian_lambda_omega
+          or abs(loss_delta) < self.cfg.lagrangian_lambda_omega
         )
       )
-      if update_lagrangian_lambda:
-        self.e_state.lagrangian_lambda += self.e_state.lagrangian_mu * constraint.item()
-        self.printer.lambda_increase(self.e_state)
-        self._reset_optimizer()
-
-      update_prev_constraint = (
-        self.cfg.lagrangian_type == LagrangianType.PENALTY
-        or update_lagrangian_lambda
-      )
-      if update_prev_constraint:
+      if subproblem_converged:
         update_lagrangian_mu = (
           self.e_state.prev_constraint is not None
           and (abs_constraint.item() > self.cfg.lagrangian_improvement_rate * abs(self.e_state.prev_constraint))
@@ -150,9 +141,21 @@ class Experiment:
         if update_lagrangian_mu:
           self.e_state.lagrangian_mu *= 10
           self.printer.mu_increase(self.e_state)
-          # Reset the optimizer as we've changed the objective
+
+        update_lagrangian_lambda = (
+          self.cfg.lagrangian_type == LagrangianType.AUGMENTED
+          and not update_lagrangian_mu
+        )
+        if update_lagrangian_lambda:
+          self.e_state.lagrangian_lambda += self.e_state.lagrangian_mu * constraint.item()
+          self.logger.log_metrics(self.e_state.global_batch, {"loss_delta_violated": loss_delta.item()})
+          self.printer.lambda_increase(self.e_state)
+        
+        if update_lagrangian_mu or update_lagrangian_lambda:
+          # Reset the optimizer as we've changed loss function
           self._reset_optimizer()
-        self.e_state.prev_constraint = constraint.item()
+
+      self.e_state.prev_constraint = constraint.item()
 
   def train(self):
     self.printer.train_start(self.device)

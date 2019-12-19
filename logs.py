@@ -22,7 +22,8 @@ class BaseLogger(object):
         'cross_entropy/minibatch': cross_entropy.item(),
         'complexity/minibatch': complexity.item(),
         #'complexity/{}/minibatch'.format(cfg.complexity_type.name): complexity.item(),
-        'loss/minibatch': loss.item()
+        'loss/minibatch': loss.item(),
+        'loss/running_avg_{}_batches'.format(cfg.lagrangian_patience_batches): np.mean(state.cross_entropy_hist)
       }
       if cfg.lagrangian_type != LagrangianType.NONE:
         metrics.update({
