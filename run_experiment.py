@@ -90,7 +90,7 @@ def single(
     id=experiment_id,
     lagrangian_mu=e_config.lagrangian_start_mu,
     lagrangian_lambda=e_config.lagrangian_start_lambda,
-    cross_entropy_hist=deque([], lagrangian_patience_batches or 1)
+    loss_hist=deque([], lagrangian_patience_batches or 1)
   )
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')

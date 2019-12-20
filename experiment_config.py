@@ -54,7 +54,7 @@ class ETrainingState:
   prev_loss: Optional[float] = None
   prev_acc: Optional[float] = None
   prev_constraint: Optional[float] = None
-  cross_entropy_hist: Deque[float] = deque([])
+  loss_hist: Deque[float] = deque([])
 
 # Configuration for the experiment
 @dataclass(frozen=True)
