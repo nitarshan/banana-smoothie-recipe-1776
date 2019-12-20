@@ -165,6 +165,8 @@ class Experiment:
       else:
         loss_delta = np.mean(self.e_state.loss_hist) - self.e_state.prev_loss
         loss_improvement_rate = loss_delta / len(self.e_state.loss_hist)
+        self.logger.log_metrics(step=self.e_state.global_batch,
+                                metrics={"minibatch/loss_improvement_rate": loss_improvement_rate})
         self.e_state.prev_loss = np.mean(self.e_state.loss_hist)
         return abs(loss_improvement_rate) < self.cfg.lagrangian_lambda_omega
 
