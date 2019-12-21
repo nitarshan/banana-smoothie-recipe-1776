@@ -1,3 +1,5 @@
+from numpy import infty
+
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
@@ -55,6 +57,7 @@ class ETrainingState:
   prev_acc: Optional[float] = None
   prev_constraint: Optional[float] = None
   loss_hist: Deque[float] = deque([])
+  constraint_to_beat = infty
 
 # Configuration for the experiment
 @dataclass(frozen=True)

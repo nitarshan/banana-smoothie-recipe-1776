@@ -176,7 +176,7 @@ class Experiment:
 
     def _check_constrained_improved_sufficiently():
       """Did the constraint improve sufficiently?"""
-      return torch.abs(constraint).item() <= self.cfg.lagrangian_improvement_rate * abs(self.e_state.prev_constraint)
+      return torch.abs(constraint).item() <= self.cfg.lagrangian_improvement_rate * abs(self.e_state.constraint_to_beat)
 
     def _check_patience():
       """Have we reached the end of our patience?"""
@@ -199,6 +199,7 @@ class Experiment:
             if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
               self.e_state.lagrangian_lambda += self.e_state.lagrangian_mu * constraint.item()
               self.printer.lambda_increase(self.e_state)
+              self.e_state.constraint_to_beat = constraint
               self._reset_optimizer()
 
       self.e_state.prev_constraint = constraint.item()
