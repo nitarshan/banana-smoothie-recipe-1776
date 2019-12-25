@@ -14,3 +14,4 @@ dependencies:
   - fire=0.2.1
   - pip:
     - tensorboard==2.0.1
+    - comet_ml==3.0.1

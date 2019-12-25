@@ -1,21 +1,27 @@
-import pathlib
-import time
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.tensorboard import SummaryWriter
 
 from dataset_helpers import get_dataloaders
 from experiment_config import (
-  ComplexityType, EConfig, ETrainingState, OptimizerType, Verbosity, DatasetSubsetType)
-from measures import calculate_complexity
+  DatasetSubsetType, EConfig, ETrainingState, LagrangianType, OptimizerType,
+  Verbosity)
+from logs import BaseLogger, DefaultLogger, Printer
 from models import get_model_for_config
 
+
+class NanLossException(Exception):
+  pass
+
+class InfeasibleException(Exception):
+  pass
+
+
 class Experiment:
-  def __init__(self, e_state:ETrainingState, device: torch.device, e_config: Optional[EConfig]=None):
+  def __init__(self, e_state:ETrainingState, device: torch.device, e_config: Optional[EConfig]=None,
+               logger: Optional[BaseLogger]=None):
     self.e_state = e_state
     self.device = device
     resume_from_checkpoint = (e_config is None) or e_config.resume_from_checkpoint
@@ -30,17 +36,21 @@ class Experiment:
     torch.manual_seed(self.cfg.seed)
     np.random.seed(self.cfg.seed)
 
+    # Logging
+    if logger is None:
+      log_file = self.cfg.log_dir / self.cfg.model_type.name / self.cfg.dataset_type.name / self.cfg.optimizer_type.name / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda) / str(self.e_state.id)
+      self.logger = DefaultLogger(log_file)
+    else:
+      self.logger = logger
+    # Printing
+    self.printer = Printer(self.e_state.id, self.cfg.verbosity)
+
     # Model
     self.model = get_model_for_config(self.cfg)
     self.model.to(device)
 
     # Optimizer
-    if self.cfg.optimizer_type == OptimizerType.SGD:
-      self.optimizer = optim.SGD(self.model.parameters(), lr=self.cfg.lr)
-    elif self.cfg.optimizer_type == OptimizerType.ADAM:
-      self.optimizer = optim.Adam(self.model.parameters(), lr=self.cfg.lr)
-    else:
-      raise KeyError
+    self._reset_optimizer()
 
     self.risk_objective = F.nll_loss
 
@@ -54,86 +64,215 @@ class Experiment:
       np.random.set_state(np_rng_state)
       torch.set_rng_state(torch_rng_state)
 
-    if self.cfg.log_tensorboard:
-      log_file = self.cfg.log_dir / str(self.e_state.id) / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda)
-      self.writer = SummaryWriter(log_file)
-      #self.writer.add_graph(self.model, self.train_loader.dataset[0][0])
+  def _reset_optimizer(self) -> None:
+    if self.cfg.optimizer_type == OptimizerType.SGD:
+      self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr)
+    elif self.cfg.optimizer_type == OptimizerType.SGD_MOMENTUM:
+      self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
+    elif self.cfg.optimizer_type == OptimizerType.ADAM:
+      self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.cfg.lr)
+    else:
+      raise KeyError
+
+  def _make_train_loss(self, cross_entropy, complexity):
+    """
+    Assembles a training loss function based on the optimization method of the experiment
+
+    Parameters:
+    -----------
+    cross_entropy: torch.Tensor, dtype=float
+      The cross-entropy of the model
+    complexity: torch.Tensor, dtype=float
+      The complexity of the model
+
+    Returns:
+    --------
+    loss: torch.Tensor, dtype=float
+      The value of the assembled loss function
+    constraint: torch.Tensor, dtype=float
+      The value of the constraint (constant for unconstrained opt)
+    is_constraint: bool
+      Whether or not the loss includes a constraint
+
+    """
+    loss = cross_entropy.clone()
+    constraint = torch.zeros(1, device=cross_entropy.device)
+    is_constrained = False
+
+    # Unconstrained optimization (optionally with complexity as regularizer)
+    if self.cfg.lagrangian_type == LagrangianType.NONE:
+      if self.cfg.complexity_lambda is not None and self.cfg.complexity_lambda > 0:
+        loss += self.cfg.complexity_lambda * complexity
+
+    # Constrained optimization
+    elif self.e_state.epoch >= self.cfg.lagrangian_start_epoch:
+      constraint = (complexity - self.cfg.lagrangian_target)
+      is_constrained = True
+
+      # Penalty method
+      if self.cfg.lagrangian_type == LagrangianType.PENALTY:
+        loss += self.e_state.lagrangian_mu * constraint ** 2
+
+      # Augmented Lagrangian Method
+      elif self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
+        loss += self.e_state.lagrangian_mu / 2 * constraint ** 2 + self.e_state.lagrangian_lambda * constraint
+
+      # Other
+      else:
+        raise ValueError("Unknown optimization method specified.")
+
+    return loss, constraint, is_constrained
 
   def _train_epoch(self) -> None:
     self.model.train()
     for batch_idx, (data, target) in enumerate(self.train_loader):
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
+      
+      self.e_state.batch = batch_idx
+      self.e_state.global_batch = (self.e_state.epoch - 1) * len(self.train_loader) + self.e_state.batch
       self.optimizer.zero_grad()
-      output = self.model(data)
-      risk = self.risk_objective(output, target)
-      if self.cfg.complexity_type == ComplexityType.NONE:
-        complexity = torch.zeros(1, device=self.device)
-      elif self.cfg.complexity_type == ComplexityType.L2:
-        complexity = calculate_complexity(self.model, self.cfg.complexity_type)
-      loss = risk + self.cfg.complexity_lambda * complexity
+      
+      output, complexity = self.model(data, self.cfg.complexity_type)
+      cross_entropy = self.risk_objective(output, target)
+
+      # Assemble the loss function based on the optimization method
+      loss, constraint, is_constrained = self._make_train_loss(cross_entropy, complexity)
+      self.e_state.loss_hist.append(loss.item())
+
+      if torch.isnan(loss):
+        raise NanLossException()
+
+      # Update network parameters
       loss.backward()
       self.optimizer.step()
 
-      if self.cfg.log_tensorboard:
-        self.writer.add_scalar('train/risk', risk.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
-        self.writer.add_scalar('train/complexity', complexity.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
-        self.writer.add_scalar('train/loss', loss.item(), self.e_state.epoch * len(self.train_loader) + batch_idx)
+      # Update lagrangian parameters
+      if is_constrained:
+        self._update_constrained_opt_parameters(loss, constraint)
+        if self.e_state.lagrangian_mu > 1e20 or self.e_state.lagrangian_lambda > 1e20:
+          raise InfeasibleException()
 
-      if self.cfg.verbosity >= Verbosity.BATCH and self.cfg.log_batch_freq is not None and batch_idx % self.cfg.log_batch_freq == 0:
-        print('[{}] Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-          self.e_state.id, self.e_state.epoch, batch_idx * len(data), len(self.train_loader.dataset), 100. * batch_idx / len(self.train_loader), loss.item()))
-    if self.e_state.epoch % self.cfg.save_epoch_freq == 0:
-      self.save_state()
+      # Log everything
+      self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
+      self.logger.log_batch_end(self.cfg, self.e_state, cross_entropy, complexity, loss, constraint)
+
+  def _update_constrained_opt_parameters(self, loss, constraint) -> None:
+    def _check_convergence():
+      """Has the loss converged?"""
+      if self.e_state.prev_loss is None:
+        self.e_state.prev_loss = np.mean(self.e_state.loss_hist)
+        return False
+      else:
+        loss_delta = np.mean(self.e_state.loss_hist) - self.e_state.prev_loss
+        loss_improvement_rate = loss_delta / len(self.e_state.loss_hist)
+        self.logger.log_metrics(step=self.e_state.global_batch,
+                                metrics={"minibatch/loss_improvement_rate": loss_improvement_rate})
+        self.e_state.prev_loss = np.mean(self.e_state.loss_hist)
+        return abs(loss_improvement_rate) < self.cfg.lagrangian_lambda_omega
+
+    def _check_constraint_violated():
+      """Is the constraint still violated?"""
+      return torch.abs(constraint) > self.cfg.lagrangian_tolerance
+
+    def _check_constrained_improved_sufficiently():
+      """Did the constraint improve sufficiently?"""
+      return torch.abs(constraint).item() <= self.cfg.lagrangian_improvement_rate * abs(self.e_state.constraint_to_beat)
+
+    def _check_patience():
+      """Have we reached the end of our patience?"""
+      return self.e_state.global_batch % self.cfg.lagrangian_patience_batches == 0
+
+    # Check if we have reached the end of a patience window and the constraint is still violated
+    if self.e_state.global_batch > 0 and _check_patience() and _check_constraint_violated():
+
+      # Check if the subproblem has converged
+      if self.e_state.prev_constraint is not None and _check_convergence():
+
+          if not _check_constrained_improved_sufficiently():
+            # Update mu
+            self.e_state.lagrangian_mu *= 10
+            self.printer.mu_increase(self.e_state)
+            self._reset_optimizer()
+
+          else:
+            # Update lambda
+            if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
+              self.e_state.lagrangian_lambda += self.e_state.lagrangian_mu * constraint.item()
+              self.printer.lambda_increase(self.e_state)
+              self.e_state.constraint_to_beat = constraint
+              self._reset_optimizer()
+
+      self.e_state.prev_constraint = constraint.item()
 
   def train(self):
-    if self.cfg.verbosity >= Verbosity.RUN:
-      start_time = time.time()
-      print('[{}] Training starting using {}'.format(self.e_state.id, self.device))
+    self.printer.train_start(self.device)
     
+    self.e_state.global_batch = 0
     for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
       self.e_state.epoch = epoch
       self._train_epoch()
-      self.evaluate(DatasetSubsetType.VAL)
 
-    if self.cfg.verbosity >= Verbosity.RUN:
-      print('[{}] Training complete in {}s'.format(self.e_state.id, time.time() - start_time))
+      if epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0:
+        val_eval = self.evaluate(DatasetSubsetType.VAL)
+        train_eval = self.evaluate(DatasetSubsetType.TRAIN)
 
-    if self.cfg.log_tensorboard:
-      self.writer.flush()
-      self.writer.close()
-    return self.evaluate(DatasetSubsetType.VAL, verbose=False)
+        self.logger.log_metrics(
+          self.e_state.epoch,
+          {
+            'generalization/error': (train_eval[0] - val_eval[0]).item(),
+            'generalization/loss': train_eval[1] - val_eval[1],
+          })
+        
+        self.printer.epoch_metrics(self.e_state.epoch, train_eval, val_eval)
+
+      if self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0:
+        self.save_state()
+
+    self.printer.train_end()
+
+    del self.logger
+    return val_eval, train_eval
 
   @torch.no_grad()
-  def evaluate(self, dataset_subset_type: DatasetSubsetType, verbose=True):
+  def evaluate(self, dataset_subset_type: DatasetSubsetType):
     self.model.eval()
     total_loss = 0
     num_correct = 0
-    correct = torch.FloatTensor(0, 1)
 
     data_loader = [self.train_loader, self.val_loader, self.test_loader][dataset_subset_type]
     num_to_evaluate_on = len(data_loader.dataset)
+    complexities = []
 
     for data, target in data_loader:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
-      prob = self.model(data)
+      prob, com = self.model(data, self.cfg.complexity_type)
+      complexities.append(com)
       total_loss += self.risk_objective(prob, target, reduction='sum').item()  # sum up batch loss
       pred = prob.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
       batch_correct = pred.eq(target.data.view_as(pred)).type(torch.FloatTensor).cpu()
-      correct = torch.cat([correct, batch_correct], 0)
       num_correct += batch_correct.sum()
 
     avg_loss = total_loss / num_to_evaluate_on
-    complexity_loss = calculate_complexity(self.model, self.cfg.complexity_type).item()
+    complexity_loss = sum(complexities).item() / len(complexities)
     acc = num_correct / num_to_evaluate_on
-    if verbose and self.cfg.verbosity >= Verbosity.EPOCH:
-      print('[{}] After {} epochs, {} loss: {:.4f}, accuracy: {}/{} ({:.2f}%)'.format(
-        self.e_state.id, self.e_state.epoch, dataset_subset_type.name, avg_loss, num_correct, num_to_evaluate_on, 100. * acc))
-    if verbose and self.cfg.log_tensorboard:
-      self.writer.add_scalar('val/acc', acc, self.e_state.epoch)
-      self.writer.add_scalar('val/loss', avg_loss, self.e_state.epoch)
-      if self.cfg.epochs == self.e_state.epoch:
-        self.writer.add_hparams(self.cfg.to_tensorboard_dict(), {'hparam/accuracy': acc, 'hparam/loss': avg_loss})
-    return acc, avg_loss, complexity_loss, correct
+
+    self.logger.log_metrics(
+      self.e_state.epoch,
+      {
+        'complexity/{}/{}'.format(self.cfg.complexity_type.name, dataset_subset_type.name.lower()): complexity_loss,
+        'cross_entropy/{}'.format(dataset_subset_type.name.lower()): avg_loss,
+        'accuracy/{}'.format(dataset_subset_type.name.lower()): acc.item(),
+      })
+    if self.cfg.epochs == self.e_state.epoch:
+      self.logger.log_hparams(
+        self.cfg.to_tensorboard_dict(),
+        {
+          'hparam/complexity': complexity_loss,
+          'hparam/accuracy': acc.item(),
+          'hparam/loss': avg_loss
+        })
+
+    return acc, avg_loss, complexity_loss, num_correct, num_to_evaluate_on
 
   def save_state(self) -> None:
     checkpoint_path = self.cfg.checkpoint_dir / str(self.e_state.id)
@@ -147,7 +286,7 @@ class Experiment:
       'torch_rng': torch.get_rng_state(),
     }, checkpoint_file)
 
-  def load_state(self) -> (EConfig, dict, dict, np.ndarray, torch.ByteTensor):
+  def load_state(self) -> Tuple[EConfig, dict, dict, np.ndarray, torch.ByteTensor]:
     checkpoint_file = self.cfg.checkpoint_dir / str(self.e_state.id) / (str(self.e_state.epoch - 1) + '.pt')
     checkpoint = torch.load(checkpoint_file)
     return checkpoint['config'], checkpoint['model'], checkpoint['optimizer'], checkpoint['np_rng'], checkpoint['torch_rng']
