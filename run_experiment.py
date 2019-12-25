@@ -2,7 +2,7 @@
 from pathlib import Path
 import pickle
 import time
-from typing import Optional
+from typing import Optional, Tuple
 from collections import deque
 
 from logs import CometLogger
@@ -14,7 +14,7 @@ from experiment_config import (
   ComplexityType, DatasetType, EConfig, ETrainingState, LagrangianType,
   ModelType, OptimizerType, Verbosity)
 
-def setup_paths(root_dir: str, experiment_id: int):
+def setup_paths(root_dir: str, experiment_id: int) -> Tuple[Path, Path, Path, Path]:
   print('[Experiment {}] Setting up directories'.format(experiment_id))
   root_path = Path(root_dir)
   results_path = root_path / 'results'

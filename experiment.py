@@ -96,11 +96,11 @@ class Experiment:
 
     """
     loss = cross_entropy.clone()
+    constraint = torch.zeros(1, device=cross_entropy.device)
+    is_constrained = False
 
     # Unconstrained optimization (optionally with complexity as regularizer)
     if self.cfg.lagrangian_type == LagrangianType.NONE:
-      constraint = torch.zeros(1, device=cross_entropy.device)
-      is_constrained = False
       if self.cfg.complexity_lambda is not None and self.cfg.complexity_lambda > 0:
         loss += self.cfg.complexity_lambda * complexity
 
@@ -121,7 +121,7 @@ class Experiment:
       else:
         raise ValueError("Unknown optimization method specified.")
 
-      return loss, constraint, is_constrained
+    return loss, constraint, is_constrained
 
   def _train_epoch(self) -> None:
     self.model.train()
