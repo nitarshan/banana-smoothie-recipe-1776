@@ -6,8 +6,8 @@ import torch.nn.functional as F
 
 from dataset_helpers import get_dataloaders
 from experiment_config import (
-  DatasetSubsetType, EConfig, ETrainingState, LagrangianType, OptimizerType,
-  Verbosity)
+  DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, LagrangianType,
+  OptimizerType)
 from logs import BaseLogger, DefaultLogger, Printer
 from models import get_model_for_config
 
@@ -74,7 +74,7 @@ class Experiment:
     else:
       raise KeyError
 
-  def _make_train_loss(self, cross_entropy, complexity):
+  def _make_train_loss(self, cross_entropy: torch.Tensor, complexity: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, bool]:
     """
     Assembles a training loss function based on the optimization method of the experiment
 
@@ -106,17 +106,15 @@ class Experiment:
 
     # Constrained optimization
     elif self.e_state.epoch >= self.cfg.lagrangian_start_epoch:
-      constraint = (complexity - self.cfg.lagrangian_target)
+      constraint = torch.abs(complexity - self.cfg.lagrangian_target)
       is_constrained = True
 
       # Penalty method
       if self.cfg.lagrangian_type == LagrangianType.PENALTY:
-        loss += self.e_state.lagrangian_mu * constraint ** 2
-
+        loss += (self.e_state.lagrangian_mu / 2) * constraint ** 2
       # Augmented Lagrangian Method
       elif self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
-        loss += self.e_state.lagrangian_mu / 2 * constraint ** 2 + self.e_state.lagrangian_lambda * constraint
-
+        loss += (self.e_state.lagrangian_mu / 2) * constraint ** 2 + self.e_state.lagrangian_lambda * constraint
       # Other
       else:
         raise ValueError("Unknown optimization method specified.")
@@ -138,6 +136,7 @@ class Experiment:
       # Assemble the loss function based on the optimization method
       loss, constraint, is_constrained = self._make_train_loss(cross_entropy, complexity)
       self.e_state.loss_hist.append(loss.item())
+      self.e_state.constraint_hist.append(constraint.item())
 
       if torch.isnan(loss):
         raise NanLossException()
@@ -148,63 +147,72 @@ class Experiment:
 
       # Update lagrangian parameters
       if is_constrained:
-        self._update_constrained_opt_parameters(loss, constraint)
-        if self.e_state.lagrangian_mu > 1e20 or self.e_state.lagrangian_lambda > 1e20:
-          raise InfeasibleException()
+        self._update_constraint_parameters()
 
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
       self.logger.log_batch_end(self.cfg, self.e_state, cross_entropy, complexity, loss, constraint)
 
-  def _update_constrained_opt_parameters(self, loss, constraint) -> None:
+  def _update_constraint_parameters(self) -> None:
+    loss = np.mean(self.e_state.loss_hist)
+    constraint = np.mean(self.e_state.constraint_hist)
+
     def _check_convergence():
       """Has the loss converged?"""
       if self.e_state.prev_loss is None:
-        self.e_state.prev_loss = np.mean(self.e_state.loss_hist)
+        self.e_state.prev_loss = loss
         return False
       else:
-        loss_delta = np.mean(self.e_state.loss_hist) - self.e_state.prev_loss
+        loss_delta = loss - self.e_state.prev_loss
         loss_improvement_rate = loss_delta / len(self.e_state.loss_hist)
         self.logger.log_metrics(step=self.e_state.global_batch,
                                 metrics={"minibatch/loss_improvement_rate": loss_improvement_rate})
-        self.e_state.prev_loss = np.mean(self.e_state.loss_hist)
+        self.e_state.prev_loss = loss
         return abs(loss_improvement_rate) < self.cfg.lagrangian_lambda_omega
 
     def _check_constraint_violated():
       """Is the constraint still violated?"""
-      return torch.abs(constraint) > self.cfg.lagrangian_tolerance
+      return constraint > self.cfg.lagrangian_tolerance * self.cfg.lagrangian_target
 
     def _check_constrained_improved_sufficiently():
       """Did the constraint improve sufficiently?"""
-      return torch.abs(constraint).item() <= self.cfg.lagrangian_improvement_rate * abs(self.e_state.constraint_to_beat)
+      return constraint <= self.cfg.lagrangian_improvement_rate * self.e_state.constraint_to_beat
 
     def _check_patience():
       """Have we reached the end of our patience?"""
       return self.e_state.global_batch % self.cfg.lagrangian_patience_batches == 0
 
     # Check if we have reached the end of a patience window and the constraint is still violated
-    if self.e_state.global_batch > 0 and _check_patience() and _check_constraint_violated():
+    if _check_patience() and _check_constraint_violated():
 
       # Check if the subproblem has converged
       if self.e_state.prev_constraint is not None and _check_convergence():
+        # Don't update during the next patience duration immediately after an update
+        if self.e_state.prev_constraint_update_epoch == self.e_state.epoch + self.cfg.lagrangian_patience_batches:
+          print('skip constraint update')
+          return None
+        if not _check_constrained_improved_sufficiently():
+          # Update mu
+          self.e_state.lagrangian_mu *= 10
+          self.printer.mu_increase(self.e_state)
+          self._reset_optimizer()
+          self.e_state.prev_constraint_update_epoch = self.e_state.epoch
 
-          if not _check_constrained_improved_sufficiently():
-            # Update mu
-            self.e_state.lagrangian_mu *= 10
-            self.printer.mu_increase(self.e_state)
+        else:
+          # Update lambda
+          if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
+            self.e_state.lagrangian_lambda += self.e_state.lagrangian_mu * constraint.item()
+            self.printer.lambda_increase(self.e_state)
             self._reset_optimizer()
+            self.e_state.prev_constraint_update_epoch = self.e_state.epoch
+          self.e_state.constraint_to_beat = constraint
 
-          else:
-            # Update lambda
-            if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
-              self.e_state.lagrangian_lambda += self.e_state.lagrangian_mu * constraint.item()
-              self.printer.lambda_increase(self.e_state)
-              self.e_state.constraint_to_beat = constraint
-              self._reset_optimizer()
+      self.e_state.prev_constraint = constraint
 
-      self.e_state.prev_constraint = constraint.item()
+    if self.e_state.lagrangian_mu > 1e10 or self.e_state.lagrangian_lambda > 1e10:
+      raise InfeasibleException()
 
-  def train(self):
+  def train(self) -> Tuple[EvaluationMetrics, EvaluationMetrics]:
     self.printer.train_start(self.device)
     
     self.e_state.global_batch = 0
@@ -215,64 +223,49 @@ class Experiment:
       if epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0:
         val_eval = self.evaluate(DatasetSubsetType.VAL)
         train_eval = self.evaluate(DatasetSubsetType.TRAIN)
-
-        self.logger.log_metrics(
-          self.e_state.epoch,
-          {
-            'generalization/error': (train_eval[0] - val_eval[0]).item(),
-            'generalization/loss': train_eval[1] - val_eval[1],
-          })
         
-        self.printer.epoch_metrics(self.e_state.epoch, train_eval, val_eval)
+        self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss)
+        self.printer.epoch_metrics(self.cfg, self.e_state, self.e_state.epoch, train_eval, val_eval)
 
       if self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0:
         self.save_state()
 
+    self.logger.log_train_end(self.cfg)
     self.printer.train_end()
 
     del self.logger
     return val_eval, train_eval
 
   @torch.no_grad()
-  def evaluate(self, dataset_subset_type: DatasetSubsetType):
+  def evaluate(self, dataset_subset_type: DatasetSubsetType) -> EvaluationMetrics:
     self.model.eval()
-    total_loss = 0
+    cross_entropy_loss = 0
+    constraint_loss = 0
+    complexity = 0
     num_correct = 0
 
     data_loader = [self.train_loader, self.val_loader, self.test_loader][dataset_subset_type]
     num_to_evaluate_on = len(data_loader.dataset)
-    complexities = []
 
     for data, target in data_loader:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
-      prob, com = self.model(data, self.cfg.complexity_type)
-      complexities.append(com)
-      total_loss += self.risk_objective(prob, target, reduction='sum').item()  # sum up batch loss
+      prob, complexity = self.model(data, self.cfg.complexity_type)
+      cross_entropy = self.risk_objective(prob, target, reduction='sum')
+      cross_entropy_loss += cross_entropy.item()  # sum up batch loss
+      total_loss, _, _ = self._make_train_loss(cross_entropy, complexity)
+      constraint_loss = (total_loss - cross_entropy).item()
+      
       pred = prob.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
       batch_correct = pred.eq(target.data.view_as(pred)).type(torch.FloatTensor).cpu()
       num_correct += batch_correct.sum()
 
-    avg_loss = total_loss / num_to_evaluate_on
-    complexity_loss = sum(complexities).item() / len(complexities)
+    complexity = complexity.item()
+    cross_entropy_loss /= num_to_evaluate_on
     acc = num_correct / num_to_evaluate_on
 
-    self.logger.log_metrics(
-      self.e_state.epoch,
-      {
-        'complexity/{}/{}'.format(self.cfg.complexity_type.name, dataset_subset_type.name.lower()): complexity_loss,
-        'cross_entropy/{}'.format(dataset_subset_type.name.lower()): avg_loss,
-        'accuracy/{}'.format(dataset_subset_type.name.lower()): acc.item(),
-      })
-    if self.cfg.epochs == self.e_state.epoch:
-      self.logger.log_hparams(
-        self.cfg.to_tensorboard_dict(),
-        {
-          'hparam/complexity': complexity_loss,
-          'hparam/accuracy': acc.item(),
-          'hparam/loss': avg_loss
-        })
+    self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc, complexity)
 
-    return acc, avg_loss, complexity_loss, num_correct, num_to_evaluate_on
+    return EvaluationMetrics(acc, cross_entropy_loss, complexity, constraint_loss, num_correct, len(data_loader.dataset))
 
   def save_state(self) -> None:
     checkpoint_path = self.cfg.checkpoint_dir / str(self.e_state.id)

@@ -3,7 +3,7 @@ from numpy import infty
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Deque, Optional
+from typing import Deque, NamedTuple, Optional
 from collections import deque
 
 class DatasetType(Enum):
@@ -56,7 +56,9 @@ class ETrainingState:
   prev_loss: Optional[float] = None
   prev_acc: Optional[float] = None
   prev_constraint: Optional[float] = None
+  prev_constraint_update_epoch: Optional[int] = None
   loss_hist: Deque[float] = deque([])
+  constraint_hist: Deque[float] = deque([])
   constraint_to_beat = infty
 
 # Configuration for the experiment
@@ -88,7 +90,7 @@ class EConfig:
   lagrangian_lambda_omega: Optional[float] = None
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = 100
-  log_epoch_freq: Optional[int] = 10
+  log_epoch_freq: Optional[int] = 20
   save_epoch_freq: Optional[int] = None
   data_dir: Path = Path('data')
   log_dir: Path = Path('logs')
@@ -151,3 +153,11 @@ class EConfig:
     del d["verbosity"]
 
     return d
+
+class EvaluationMetrics(NamedTuple):
+  acc: float
+  avg_loss: float
+  complexity: float
+  complexity_loss: float
+  num_correct: int
+  num_to_evaluate_on: int

@@ -33,8 +33,8 @@ python run_experiment.py single \
 --lagrangian_target=30 \
 --lagrangian_start_epoch=0 \
 --lagrangian_start_mu=1e-6 \
---lagrangian_tolerance=1e-3 \
---lagrangian_patience_batches=100 \
+--lagrangian_tolerance=0.01 \
+--lagrangian_patience_batches=250 \
 --lagrangian_improvement_rate=0.75 \
 --lagrangian_start_lambda=0 \
 --lagrangian_lambda_omega=1e-3 \
