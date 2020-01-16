@@ -18,7 +18,8 @@ class DatasetSubsetType(IntEnum):
 
 class ModelType(Enum):
   DEEP = 1
-  CONV = 2
+  DEEP_UNDER = 2
+  CONV = 3
 
 class ComplexityType(Enum):
   NONE = 1

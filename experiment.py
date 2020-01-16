@@ -10,6 +10,7 @@ from experiment_config import (
   OptimizerType)
 from logs import BaseLogger, DefaultLogger, Printer
 from models import get_model_for_config
+from torch.optim.lr_scheduler import MultiStepLR
 
 
 class NanLossException(Exception):
@@ -47,15 +48,17 @@ class Experiment:
 
     # Model
     self.model = get_model_for_config(self.cfg)
+    print("Number of parameters", sum(p.numel() for p in self.model.parameters() if p.requires_grad))
     self.model.to(device)
 
     # Optimizer
-    self._reset_optimizer()
+    self.optimizer = self._reset_optimizer()
+    self.scheduler = self._reset_scheduler()
 
-    self.risk_objective = F.nll_loss
+    self.risk_objective = F.cross_entropy
 
     # Load data
-    self.train_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device)
+    self.train_loader, self.train_val_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device)
 
     # Cleanup when resuming from checkpoint
     if resume_from_checkpoint:
@@ -64,15 +67,18 @@ class Experiment:
       np.random.set_state(np_rng_state)
       torch.set_rng_state(torch_rng_state)
 
-  def _reset_optimizer(self) -> None:
+  def _reset_optimizer(self) -> torch.optim.Optimizer:
     if self.cfg.optimizer_type == OptimizerType.SGD:
-      self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr)
+      return torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr)
     elif self.cfg.optimizer_type == OptimizerType.SGD_MOMENTUM:
-      self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
+      return torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
     elif self.cfg.optimizer_type == OptimizerType.ADAM:
-      self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.cfg.lr)
+      return torch.optim.Adam(self.model.parameters(), lr=self.cfg.lr)
     else:
       raise KeyError
+  
+  def _reset_scheduler(self) -> torch.optim.lr_scheduler._LRScheduler:
+    return MultiStepLR(self.optimizer, milestones=[60000], gamma=0.2) 
 
   def _make_train_loss(self, cross_entropy: torch.Tensor, complexity: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, bool]:
     """
@@ -130,8 +136,8 @@ class Experiment:
       self.e_state.global_batch = (self.e_state.epoch - 1) * len(self.train_loader) + self.e_state.batch
       self.optimizer.zero_grad()
       
-      output, complexity = self.model(data, self.cfg.complexity_type)
-      cross_entropy = self.risk_objective(output, target)
+      logits, complexity = self.model(data, self.cfg.complexity_type)
+      cross_entropy = self.risk_objective(logits, target)
 
       # Assemble the loss function based on the optimization method
       loss, constraint, is_constrained = self._make_train_loss(cross_entropy, complexity)
@@ -195,7 +201,7 @@ class Experiment:
           # Update mu
           self.e_state.lagrangian_mu *= 10
           self.printer.mu_increase(self.e_state)
-          self._reset_optimizer()
+          self.scheduler = self._reset_scheduler()
           self.e_state.prev_constraint_update_epoch = self.e_state.epoch
 
         else:
@@ -203,7 +209,7 @@ class Experiment:
           if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
             self.e_state.lagrangian_lambda += self.e_state.lagrangian_mu * constraint.item()
             self.printer.lambda_increase(self.e_state)
-            self._reset_optimizer()
+            self.scheduler = self._reset_scheduler()
             self.e_state.prev_constraint_update_epoch = self.e_state.epoch
           self.e_state.constraint_to_beat = constraint
 
@@ -219,6 +225,7 @@ class Experiment:
     for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
       self.e_state.epoch = epoch
       self._train_epoch()
+      self.scheduler.step(epoch)
 
       if epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0:
         val_eval = self.evaluate(DatasetSubsetType.VAL)
@@ -244,18 +251,18 @@ class Experiment:
     complexity = 0
     num_correct = 0
 
-    data_loader = [self.train_loader, self.val_loader, self.test_loader][dataset_subset_type]
+    data_loader = [self.train_val_loader, self.val_loader, self.test_loader][dataset_subset_type]
     num_to_evaluate_on = len(data_loader.dataset)
 
     for data, target in data_loader:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
-      prob, complexity = self.model(data, self.cfg.complexity_type)
-      cross_entropy = self.risk_objective(prob, target, reduction='sum')
+      logits, complexity = self.model(data, self.cfg.complexity_type)
+      cross_entropy = self.risk_objective(logits, target, reduction='sum')
       cross_entropy_loss += cross_entropy.item()  # sum up batch loss
       total_loss, _, _ = self._make_train_loss(cross_entropy, complexity)
       constraint_loss = (total_loss - cross_entropy).item()
       
-      pred = prob.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
+      pred = logits.data.max(1, keepdim=True)[1]  # get the index of the max logits
       batch_correct = pred.eq(target.data.view_as(pred)).type(torch.FloatTensor).cpu()
       num_correct += batch_correct.sum()
 

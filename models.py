@@ -10,6 +10,8 @@ from experiment_config import DatasetType, ComplexityType, EConfig, ModelType
 def get_model_for_config(e_config: EConfig) -> nn.Module:
   if e_config.model_type == ModelType.DEEP:
     return DeepNet([30, 30], e_config.dataset_type)
+  elif e_config.model_type == ModelType.DEEP_UNDER:
+    return DeepNet([5], e_config.dataset_type)
   elif e_config.model_type == ModelType.CONV:
     return ConvNet(e_config.dataset_type)
   raise KeyError
@@ -18,7 +20,6 @@ class ExperimentBaseModel(nn.Module):
   def __init__(self, dataset_type: DatasetType):
     super().__init__()
     self.dataset_properties = get_dataset_properties(dataset_type)
-    self.layers = []
 
   def forward(self, x):
     raise NotImplementedError
@@ -64,7 +65,6 @@ class DeepNet(ExperimentBaseModel):
     for layer in self.layers[:-1]:
       x = F.relu(layer(x))
     x = self.layers[-1](x)
-    x = F.log_softmax(x, dim=1)
     complexity = self.get_complexity(x, complexity_type)
     return x, complexity
   
@@ -87,15 +87,15 @@ class ConvNet(ExperimentBaseModel):
     self.fc2 = nn.Linear(120, 84)
     self.fc3 = nn.Linear(84, self.dataset_properties.K)
 
-  def forward(self, x):
+  def forward(self, x, complexity_type: ComplexityType):
     x = self.pool(F.relu(self.conv1(x)))
     x = self.pool(F.relu(self.conv2(x)))
     x = x.view(-1, 16 * 5 * 5)
     x = F.relu(self.fc1(x))
     x = F.relu(self.fc2(x))
     x = self.fc3(x)
-    x = F.log_softmax(x, dim=1)
-    return x
+    complexity = self.get_complexity(x, complexity_type)
+    return x, complexity
 
   def path_norm(self, x):
     x = torch.ones((1,self.dataset_properties.D), device=x.device)

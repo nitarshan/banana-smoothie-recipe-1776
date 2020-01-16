@@ -37,7 +37,7 @@ def single(
   epochs: int,
   batch_size: int,
   complexity_type: str,
-  complexity_lambda: Optional[float],
+  complexity_lambda: Optional[float] = None,
   lagrangian_type: str = LagrangianType.NONE.name,
   lagrangian_target: Optional[float] = None,
   lagrangian_start_epoch: Optional[int] = None,
