@@ -31,7 +31,8 @@ def setup_paths(root_dir: str, experiment_id: int) -> Tuple[Path, Path, Path, Pa
 def single(
   root_dir: str,
   model_type: str,
-  model_shape: List[int],
+  model_width: int,
+  model_depth: int,
   dataset_type: str,
   optimizer_type: str,
   lr: float,
@@ -67,7 +68,7 @@ def single(
     seed=seed,
     use_cuda=use_cuda,
     model_type= ModelType[model_type],
-    model_shape=model_shape,
+    model_shape=[model_width]*model_depth,
     dataset_type=DatasetType[dataset_type],
     batch_size=batch_size,
     optimizer_type=OptimizerType[optimizer_type],

@@ -26,7 +26,8 @@ targets=(19.73 8096.64 26.50 381.56 45.56) # See complexity_lambda_analysis.ipyn
 python run_experiment.py single \
 --root_dir=$SLURM_TMPDIR \
 --model_type='DEEP' \
---model_shape=[300,300] \
+--model_width=30 \
+--model_depth=2 \
 --dataset_type='MNIST' \
 --optimizer_type='SGD_MOMENTUM' \
 --lr=0.05 \
