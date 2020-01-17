@@ -53,6 +53,7 @@ def single(
   comet_tag: Optional[str] = None,
   logger: Optional[object] = None,
   save_epoch_freq: Optional[int] = None,
+  seed: Optional[int] = None,
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
@@ -60,7 +61,8 @@ def single(
 
   results_path, log_path, data_path, checkpoint_path = setup_paths(root_dir, experiment_id)
 
-  seed = experiment_id % (2**32)
+  if seed is None:
+    seed = experiment_id % (2**32)
   e_config = EConfig(
     seed=seed,
     use_cuda=use_cuda,
