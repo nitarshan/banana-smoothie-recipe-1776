@@ -12,10 +12,11 @@ from logs import BaseLogger, DefaultLogger, Printer
 from models import get_model_for_config
 
 
-class NanLossException(Exception):
-  pass
-
 class InfeasibleException(Exception):
+    pass
+
+
+class NanLossException(Exception):
   pass
 
 
@@ -224,7 +225,7 @@ class Experiment:
         val_eval = self.evaluate(DatasetSubsetType.VAL)
         train_eval = self.evaluate(DatasetSubsetType.TRAIN)
         
-        self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss)
+        self.logger.log_generalization_gap(self.e_state, train_eval.acc.item(), val_eval.acc.item(), train_eval.avg_loss, val_eval.avg_loss)
         self.printer.epoch_metrics(self.cfg, self.e_state, self.e_state.epoch, train_eval, val_eval)
 
       if self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0:
@@ -263,7 +264,7 @@ class Experiment:
     cross_entropy_loss /= num_to_evaluate_on
     acc = num_correct / num_to_evaluate_on
 
-    self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc, complexity)
+    self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc.item(), complexity)
 
     return EvaluationMetrics(acc, cross_entropy_loss, complexity, constraint_loss, num_correct, len(data_loader.dataset))
 
