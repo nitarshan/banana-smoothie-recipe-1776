@@ -2,7 +2,7 @@
 from pathlib import Path
 import pickle
 import time
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from collections import deque
 
 from logs import CometLogger
@@ -31,6 +31,7 @@ def setup_paths(root_dir: str, experiment_id: int) -> Tuple[Path, Path, Path, Pa
 def single(
   root_dir: str,
   model_type: str,
+  model_shape: List[int],
   dataset_type: str,
   optimizer_type: str,
   lr: float,
@@ -64,6 +65,7 @@ def single(
     seed=seed,
     use_cuda=use_cuda,
     model_type= ModelType[model_type],
+    model_shape=model_shape,
     dataset_type=DatasetType[dataset_type],
     batch_size=batch_size,
     optimizer_type=OptimizerType[optimizer_type],

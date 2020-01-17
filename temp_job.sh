@@ -26,14 +26,15 @@ targets=(19.73 8096.64 26.50 381.56 45.56) # See complexity_lambda_analysis.ipyn
 python run_experiment.py single \
 --root_dir=$SLURM_TMPDIR \
 --model_type='DEEP' \
+--model_shape=[300,300] \
 --dataset_type='MNIST' \
 --optimizer_type='SGD_MOMENTUM' \
---lr=0.01 \
+--lr=0.05 \
 --epochs=200 \
 --batch_size=100 \
 --complexity_type='L2' \
 --complexity_lambda=None \
---lagrangian_type='AUGMENTED' \
+--lagrangian_type='NONE' \
 --lagrangian_target=30 \
 --lagrangian_start_epoch=0 \
 --lagrangian_start_mu=1e-6 \

@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from dataset_helpers import get_dataloaders
 from experiment_config import (
-  DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, LagrangianType,
+  DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, LagrangianType, ModelType,
   OptimizerType)
 from logs import BaseLogger, DefaultLogger, Printer
 from models import get_model_for_config
@@ -79,6 +79,9 @@ class Experiment:
       raise KeyError
   
   def _reset_scheduler(self) -> torch.optim.lr_scheduler._LRScheduler:
+    if self.cfg.model_type == ModelType.RESNET:
+      # https://gist.github.com/y0ast/d91d09565462125a1eb75acc65da1469
+      return MultiStepLR(self.optimizer, milestones=[25, 40], gamma=0.1)
     return MultiStepLR(self.optimizer, milestones=[60000], gamma=0.2) 
 
   def _make_train_loss(self, cross_entropy: torch.Tensor, complexity: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, bool]:

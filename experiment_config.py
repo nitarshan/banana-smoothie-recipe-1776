@@ -3,7 +3,7 @@ from numpy import infty
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Deque, NamedTuple, Optional
+from typing import Deque, NamedTuple, Optional, List
 from collections import deque
 
 class DatasetType(Enum):
@@ -18,8 +18,8 @@ class DatasetSubsetType(IntEnum):
 
 class ModelType(Enum):
   DEEP = 1
-  DEEP_UNDER = 2
-  CONV = 3
+  CONV = 2
+  RESNET = 3
 
 class ComplexityType(Enum):
   NONE = 1
@@ -68,6 +68,7 @@ class EConfig:
   use_cuda: bool
   # Model
   model_type: ModelType
+  model_shape: List[int]
   # Dataset
   dataset_type: DatasetType
   # Training

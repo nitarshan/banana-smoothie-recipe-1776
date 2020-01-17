@@ -6,14 +6,15 @@ import torch.nn.functional as F
 
 from dataset_helpers import get_dataset_properties
 from experiment_config import DatasetType, ComplexityType, EConfig, ModelType
+from torchvision.models import resnet18
 
 def get_model_for_config(e_config: EConfig) -> nn.Module:
   if e_config.model_type == ModelType.DEEP:
-    return DeepNet([30, 30], e_config.dataset_type)
-  elif e_config.model_type == ModelType.DEEP_UNDER:
-    return DeepNet([5], e_config.dataset_type)
+    return DeepNet(e_config.model_shape, e_config.dataset_type)
   elif e_config.model_type == ModelType.CONV:
     return ConvNet(e_config.dataset_type)
+  elif e_config.model_type == ModelType.RESNET:
+    return ResNet(e_config.dataset_type)
   raise KeyError
 
 class ExperimentBaseModel(nn.Module):
@@ -108,3 +109,18 @@ class ConvNet(ExperimentBaseModel):
     x = F.relu(F.linear(x, self.fc2.weight ** 2, self.fc2.bias ** 2))
     x = F.linear(x, self.fc3.weight ** 2, self.fc3.bias ** 2)
     return x
+
+# https://gist.github.com/y0ast/d91d09565462125a1eb75acc65da1469
+class ResNet(ExperimentBaseModel):
+  def __init__(self, dataset_type: DatasetType):
+    super().__init__(dataset_type)
+    self.resnet = resnet18(pretrained=False, num_classes=self.dataset_properties.K)
+    self.resnet.conv1 = torch.nn.Conv2d(
+        3, 64, kernel_size=3, stride=1, padding=1, bias=False
+    )
+    self.resnet.maxpool = torch.nn.Identity()
+
+  def forward(self, x, complexity_type: ComplexityType):
+    x = self.resnet(x)
+    complexity = self.get_complexity(x, complexity_type)
+    return x, complexity
