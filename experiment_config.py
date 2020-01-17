@@ -57,7 +57,6 @@ class ETrainingState:
   prev_loss: Optional[float] = None
   prev_acc: Optional[float] = None
   prev_constraint: Optional[float] = None
-  prev_constraint_update_epoch: Optional[int] = None
   loss_hist: Deque[float] = deque([])
   constraint_hist: Deque[float] = deque([])
   constraint_to_beat = infty

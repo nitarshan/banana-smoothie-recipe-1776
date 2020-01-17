@@ -193,16 +193,11 @@ class Experiment:
 
       # Check if the subproblem has converged
       if self.e_state.prev_constraint is not None and _check_convergence():
-        # Don't update during the next patience duration immediately after an update
-        if self.e_state.prev_constraint_update_epoch == self.e_state.epoch + self.cfg.lagrangian_patience_batches:
-          print('skip constraint update')
-          return None
         if not _check_constrained_improved_sufficiently():
           # Update mu
           self.e_state.lagrangian_mu *= 10
           self.printer.mu_increase(self.e_state)
           self.scheduler = self._reset_scheduler()
-          self.e_state.prev_constraint_update_epoch = self.e_state.epoch
 
         else:
           # Update lambda
@@ -210,7 +205,6 @@ class Experiment:
             self.e_state.lagrangian_lambda += self.e_state.lagrangian_mu * constraint.item()
             self.printer.lambda_increase(self.e_state)
             self.scheduler = self._reset_scheduler()
-            self.e_state.prev_constraint_update_epoch = self.e_state.epoch
           self.e_state.constraint_to_beat = constraint
 
       self.e_state.prev_constraint = constraint
