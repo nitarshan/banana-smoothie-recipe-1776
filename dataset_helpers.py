@@ -24,7 +24,7 @@ def get_dataset_properties(dataset_name: DatasetType) -> DatasetProperties:
     return DatasetProperties(DatasetType.CIFAR100, 3*32*32, 100, True)
   raise KeyError()
 
-def get_dataloaders(dataset_name: DatasetType, data_path: Path, batch_size: int, device: torch.device) -> Tuple[DataLoader, DataLoader, DataLoader]:
+def get_dataloaders(dataset_name: DatasetType, data_path: Path, batch_size: int, device: torch.device) -> Tuple[DataLoader, DataLoader, DataLoader, DataLoader]:
   if dataset_name == DatasetType.MNIST:
     train = MNIST(device, data_path, train=True, download=True)
     test = MNIST(device, data_path, train=False, download=True)
@@ -39,9 +39,10 @@ def get_dataloaders(dataset_name: DatasetType, data_path: Path, batch_size: int,
   train, val = torch.utils.data.random_split(train, (len(train) - validation_size, validation_size))
 
   train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=0)
+  train_val_loader = DataLoader(train, batch_size=5000, shuffle=False, num_workers=0)
   val_loader = DataLoader(val, batch_size=5000, shuffle=False, num_workers=0)
   test_loader = DataLoader(test, batch_size=5000, shuffle=False, num_workers=0)
-  return train_loader, val_loader, test_loader
+  return train_loader, train_val_loader, val_loader, test_loader
 
 # https://gist.github.com/y0ast/f69966e308e549f013a92dc66debeeb4
 # We need to keep the class name the same as base class methods rely on it
@@ -65,14 +66,18 @@ class CIFAR10(tv.datasets.CIFAR10):
   def __init__(self, device, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-    self.data = torch.from_numpy(self.data.transpose((0, 3, 1, 2)))
-    self.targets = torch.tensor(self.targets, dtype=torch.long)
+    # Scale data to [0,1] floats
+    self.data = self.data / 255
 
-    # Scale data to [0,1]
-    self.data = self.data.float().div(255)
-    
-    # Normalize it
-    self.data = self.data.sub_(0.5).div_(0.5)
+    # Normalize data
+    self.data = (self.data - self.data.mean(axis=(0,1,2))) / self.data.std(axis=(0,1,2))
+
+    # NHWC -> NCHW
+    self.data = self.data.transpose((0, 3, 1, 2))
+
+    # Numpy -> Torch
+    self.data = torch.tensor(self.data, dtype=torch.float32)
+    self.targets = torch.tensor(self.targets, dtype=torch.long)
     
     # Put both data and targets on GPU in advance
     self.data, self.targets = self.data.to(device), self.targets.to(device)

@@ -1,4 +1,5 @@
 # 1. Load your environment
+echo 'Load Environment'
 source /network/home/rajkuman/.bashrc
 module purge
 module load anaconda/3
@@ -6,13 +7,16 @@ source $CONDA_ACTIVATE
 conda activate ccm
 
 # 2. Prepare directories and copy dataset onto the compute node
+echo 'Loading Datasets'
 mkdir -p /network/tmp1/rajkuman/results
 mkdir -p $SLURM_TMPDIR/data/MNIST/
 mkdir $SLURM_TMPDIR/results
 cp -r /network/data1/mnist/processed $SLURM_TMPDIR/data/MNIST/
 cp -r /network/data1/cifar/cifar-10-batches-py $SLURM_TMPDIR/data/
+# cp -r /network/data1/svhn $SLURM_TMPDIR/data/
 
 # 3. Launch your job
+echo 'Launching Experiment'
 model='DEEP'
 dataset='MNIST'
 optimizer='SGD_MOMENTUM'

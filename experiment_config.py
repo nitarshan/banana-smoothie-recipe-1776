@@ -18,7 +18,8 @@ class DatasetSubsetType(IntEnum):
 
 class ModelType(Enum):
   DEEP = 1
-  CONV = 2
+  DEEP_UNDER = 2
+  CONV = 3
 
 class ComplexityType(Enum):
   NONE = 1
@@ -56,7 +57,6 @@ class ETrainingState:
   prev_loss: Optional[float] = None
   prev_acc: Optional[float] = None
   prev_constraint: Optional[float] = None
-  prev_constraint_update_epoch: Optional[int] = None
   loss_hist: Deque[float] = deque([])
   constraint_hist: Deque[float] = deque([])
   constraint_to_beat = infty
