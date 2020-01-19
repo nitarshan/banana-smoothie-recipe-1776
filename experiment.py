@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from dataset_helpers import get_dataloaders
 from experiment_config import (
-  DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, LagrangianType, ModelType,
+  ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, LagrangianType, ModelType,
   OptimizerType)
 from logs import BaseLogger, DefaultLogger, Printer
 from models import get_model_for_config
@@ -272,7 +272,11 @@ class Experiment:
 
     self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc.item(), complexity)
 
-    return EvaluationMetrics(acc, cross_entropy_loss, complexity, constraint_loss, num_correct, len(data_loader.dataset))
+    all_complexities = {}
+    for c in ComplexityType:
+      all_complexities[c] = self.model.get_complexity(self.device, c).item()
+
+    return EvaluationMetrics(acc, cross_entropy_loss, complexity, constraint_loss, num_correct, len(data_loader.dataset), all_complexities)
 
   def save_state(self) -> None:
     checkpoint_path = self.cfg.checkpoint_dir / str(self.e_state.id)

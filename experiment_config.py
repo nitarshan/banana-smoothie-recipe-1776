@@ -3,7 +3,7 @@ from numpy import infty
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Deque, NamedTuple, Optional, List
+from typing import Deque, Dict, NamedTuple, Optional, List
 from collections import deque
 
 class DatasetType(Enum):
@@ -163,3 +163,4 @@ class EvaluationMetrics(NamedTuple):
   complexity_loss: float
   num_correct: int
   num_to_evaluate_on: int
+  all_complexities: Dict[ComplexityType, float]
