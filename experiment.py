@@ -59,7 +59,7 @@ class Experiment:
     self.risk_objective = F.cross_entropy
 
     # Load data
-    self.train_loader, self.train_val_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device)
+    self.train_loader, self.train_eval_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device, self.cfg.data_seed)
 
     # Cleanup when resuming from checkpoint
     if resume_from_checkpoint:
@@ -140,7 +140,8 @@ class Experiment:
       self.e_state.global_batch = (self.e_state.epoch - 1) * len(self.train_loader) + self.e_state.batch
       self.optimizer.zero_grad()
       
-      logits, complexity = self.model(data, self.cfg.complexity_type)
+      logits = self.model(data)
+      complexity = self.model.get_complexity(logits.device, self.cfg.complexity_type)
       cross_entropy = self.risk_objective(logits, target)
 
       # Assemble the loss function based on the optimization method
@@ -249,12 +250,13 @@ class Experiment:
     complexity = 0
     num_correct = 0
 
-    data_loader = [self.train_val_loader, self.val_loader, self.test_loader][dataset_subset_type]
+    data_loader = [self.train_eval_loader, self.val_loader, self.test_loader][dataset_subset_type]
     num_to_evaluate_on = len(data_loader.dataset)
 
     for data, target in data_loader:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
-      logits, complexity = self.model(data, self.cfg.complexity_type)
+      logits = self.model(data)
+      complexity = self.model.get_complexity(logits.device, self.cfg.complexity_type)
       cross_entropy = self.risk_objective(logits, target, reduction='sum')
       cross_entropy_loss += cross_entropy.item()  # sum up batch loss
       total_loss, _, _ = self._make_train_loss(cross_entropy, complexity)

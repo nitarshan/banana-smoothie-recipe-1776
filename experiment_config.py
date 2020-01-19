@@ -65,6 +65,7 @@ class ETrainingState:
 @dataclass(frozen=True)
 class EConfig:
   seed: int
+  data_seed: Optional[int]
   use_cuda: bool
   # Model
   model_type: ModelType

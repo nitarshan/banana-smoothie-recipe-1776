@@ -55,6 +55,7 @@ def single(
   logger: Optional[object] = None,
   save_epoch_freq: Optional[int] = None,
   seed: Optional[int] = None,
+  data_seed: Optional[int] = None,
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
@@ -66,6 +67,7 @@ def single(
     seed = experiment_id % (2**32)
   e_config = EConfig(
     seed=seed,
+    data_seed=data_seed,
     use_cuda=use_cuda,
     model_type= ModelType[model_type],
     model_shape=[model_width]*model_depth,

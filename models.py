@@ -22,23 +22,23 @@ class ExperimentBaseModel(nn.Module):
     super().__init__()
     self.dataset_properties = get_dataset_properties(dataset_type)
 
-  def forward(self, x):
+  def forward(self, x) -> torch.Tensor:
     raise NotImplementedError
 
   def get_flat_params(self) -> torch.Tensor:
     return torch.cat([p.view(-1) for p in self.parameters()], dim=0)
   
-  def path_norm(self) -> torch.FloatTensor:
+  def path_norm(self, device: torch.device) -> torch.Tensor:
     raise NotImplementedError
 
-  def get_complexity(self, output: torch.Tensor, complexity_type: ComplexityType) -> torch.Tensor:
+  def get_complexity(self, device: torch.device, complexity_type: ComplexityType) -> torch.Tensor:
     def prod_of_fro():
       return torch.prod(torch.cat([p.norm('fro').unsqueeze(0) ** 2 for p in self.parameters()]))
     def param_norm():
       return torch.sum(torch.cat([p.norm('fro').unsqueeze(0) ** 2 for p in self.parameters()]))
       
     if complexity_type == ComplexityType.NONE:
-      return torch.zeros((1,), device=output.device)
+      return torch.zeros((1,), device=device)
     elif complexity_type == ComplexityType.L2:
       return torch.norm(self.get_flat_params(), p=2)
     elif complexity_type == ComplexityType.PROD_OF_FRO:
@@ -49,7 +49,7 @@ class ExperimentBaseModel(nn.Module):
     elif complexity_type == ComplexityType.PARAM_NORM:
       return param_norm()
     elif complexity_type == ComplexityType.PATH_NORM:
-      return self.path_norm(output)
+      return self.path_norm(device)
     raise KeyError
 
 class DeepNet(ExperimentBaseModel):
@@ -61,16 +61,15 @@ class DeepNet(ExperimentBaseModel):
       [nn.Linear(hidden_sizes[i], hidden_sizes[i+1]) for i in range(len(hidden_sizes)-1)] + # Hidden
       [nn.Linear(hidden_sizes[-1], self.dataset_properties.K)]) # Output
 
-  def forward(self, x, complexity_type: ComplexityType):
+  def forward(self, x) -> torch.Tensor:
     x = x.view(-1,self.dataset_properties.D)
     for layer in self.layers[:-1]:
       x = F.relu(layer(x))
     x = self.layers[-1](x)
-    complexity = self.get_complexity(x, complexity_type)
-    return x, complexity
+    return x
   
-  def path_norm(self, x):
-    x = torch.ones((1,self.dataset_properties.D), device=x.device)
+  def path_norm(self, device: torch.device) -> torch.Tensor:
+    x = torch.ones((1,self.dataset_properties.D), device=device)
     for layer in self.layers[:-1]:
       x = F.relu(F.linear(x, layer.weight ** 2, layer.bias ** 2))
     x = F.linear(x, self.layers[-1].weight ** 2, self.layers[-1].bias ** 2)
@@ -88,18 +87,17 @@ class ConvNet(ExperimentBaseModel):
     self.fc2 = nn.Linear(120, 84)
     self.fc3 = nn.Linear(84, self.dataset_properties.K)
 
-  def forward(self, x, complexity_type: ComplexityType):
+  def forward(self, x) -> torch.Tensor:
     x = self.pool(F.relu(self.conv1(x)))
     x = self.pool(F.relu(self.conv2(x)))
     x = x.view(-1, 16 * 5 * 5)
     x = F.relu(self.fc1(x))
     x = F.relu(self.fc2(x))
     x = self.fc3(x)
-    complexity = self.get_complexity(x, complexity_type)
-    return x, complexity
+    return x
 
-  def path_norm(self, x):
-    x = torch.ones((1,self.dataset_properties.D), device=x.device)
+  def path_norm(self, device: torch.device) -> torch.Tensor:
+    x = torch.ones((1,self.dataset_properties.D), device=device)
     x = F.conv2d(input, self.conv1.weight ** 2, self.conv1.bias ** 2, self.conv1.stride, self.conv1.padding, self.conv1.dilation, self.conv1.groups)
     x = self.pool(F.relu(x))
     x = F.conv2d(input, self.conv2.weight ** 2, self.conv2.bias ** 2, self.conv2.stride, self.conv2.padding, self.conv2.dilation, self.conv2.groups)
@@ -108,6 +106,7 @@ class ConvNet(ExperimentBaseModel):
     x = F.relu(F.linear(x, self.fc1.weight ** 2, self.fc1.bias ** 2))
     x = F.relu(F.linear(x, self.fc2.weight ** 2, self.fc2.bias ** 2))
     x = F.linear(x, self.fc3.weight ** 2, self.fc3.bias ** 2)
+    x = torch.sqrt(torch.sum(x))
     return x
 
 # https://gist.github.com/y0ast/d91d09565462125a1eb75acc65da1469
@@ -120,7 +119,5 @@ class ResNet(ExperimentBaseModel):
     )
     self.resnet.maxpool = torch.nn.Identity()
 
-  def forward(self, x, complexity_type: ComplexityType):
-    x = self.resnet(x)
-    complexity = self.get_complexity(x, complexity_type)
-    return x, complexity
+  def forward(self, x) -> torch.Tensor:
+    return self.resnet(x)
