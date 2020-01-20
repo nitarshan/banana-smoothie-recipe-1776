@@ -60,6 +60,7 @@ class ETrainingState:
   loss_hist: Deque[float] = deque([])
   constraint_hist: Deque[float] = deque([])
   constraint_to_beat = infty
+  converged: bool = False
 
 # Configuration for the experiment
 @dataclass(frozen=True)

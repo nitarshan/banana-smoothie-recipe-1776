@@ -22,7 +22,7 @@ class NanLossException(Exception):
 
 
 class Experiment:
-  def __init__(self, e_state:ETrainingState, device: torch.device, e_config: Optional[EConfig]=None,
+  def __init__(self, e_state: ETrainingState, device: torch.device, e_config: Optional[EConfig]=None,
                logger: Optional[BaseLogger]=None):
     self.e_state = e_state
     self.device = device
@@ -159,27 +159,31 @@ class Experiment:
       # Update lagrangian parameters
       if is_constrained:
         self._update_constraint_parameters()
+      elif self.e_state.global_batch % self.cfg.lagrangian_patience_batches == 0:
+        self.e_state.converged = self._check_convergence()
 
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
       self.logger.log_batch_end(self.cfg, self.e_state, cross_entropy, complexity, loss, constraint)
 
-  def _update_constraint_parameters(self) -> None:
-    loss = np.mean(self.e_state.loss_hist)
-    constraint = np.mean(self.e_state.constraint_hist)
+      if self.e_state.converged:
+        break
 
-    def _check_convergence():
-      """Has the loss converged?"""
-      if self.e_state.prev_loss is None:
-        self.e_state.prev_loss = loss
-        return False
-      else:
-        loss_delta = loss - self.e_state.prev_loss
-        loss_improvement_rate = loss_delta / len(self.e_state.loss_hist)
-        self.logger.log_metrics(step=self.e_state.global_batch,
-                                metrics={"minibatch/loss_improvement_rate": loss_improvement_rate})
-        self.e_state.prev_loss = loss
-        return abs(loss_improvement_rate) < self.cfg.lagrangian_lambda_omega
+  def _check_convergence(self) -> bool:
+    loss = np.mean(self.e_state.loss_hist)
+    if self.e_state.prev_loss is None:
+      self.e_state.prev_loss = loss
+      return False
+    else:
+      loss_delta = loss - self.e_state.prev_loss
+      loss_improvement_rate = loss_delta / len(self.e_state.loss_hist)
+      self.logger.log_metrics(step=self.e_state.global_batch,
+                              metrics={"minibatch/loss_improvement_rate": loss_improvement_rate})
+      self.e_state.prev_loss = loss
+      return abs(loss_improvement_rate) < self.cfg.lagrangian_lambda_omega
+
+  def _update_constraint_parameters(self) -> None:
+    constraint = np.mean(self.e_state.constraint_hist)
 
     def _check_constraint_violated():
       """Is the constraint still violated?"""
@@ -197,22 +201,25 @@ class Experiment:
     if _check_patience() and _check_constraint_violated():
 
       # Check if the subproblem has converged
-      if self.e_state.prev_constraint is not None and _check_convergence():
+      if self.e_state.prev_constraint is not None and self._check_convergence():
         if not _check_constrained_improved_sufficiently():
           # Update mu
           self.e_state.lagrangian_mu *= 10
           self.printer.mu_increase(self.e_state)
           self.scheduler = self._reset_scheduler()
-
+          self.e_state.prev_loss = None
         else:
           # Update lambda
           if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
             self.e_state.lagrangian_lambda += self.e_state.lagrangian_mu * constraint.item()
             self.printer.lambda_increase(self.e_state)
             self.scheduler = self._reset_scheduler()
+            self.e_state.prev_loss = None
           self.e_state.constraint_to_beat = constraint
 
       self.e_state.prev_constraint = constraint
+    elif _check_patience() and not _check_constraint_violated():
+      self.e_state.converged = self._check_convergence()
 
     if self.e_state.lagrangian_mu > 1e10 or self.e_state.lagrangian_lambda > 1e10:
       raise InfeasibleException()
@@ -226,7 +233,7 @@ class Experiment:
       self._train_epoch()
       self.scheduler.step(epoch)
 
-      if epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0:
+      if epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0 or self.e_state.converged:
         val_eval = self.evaluate(DatasetSubsetType.VAL)
         train_eval = self.evaluate(DatasetSubsetType.TRAIN)
         
@@ -235,6 +242,10 @@ class Experiment:
 
       if self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0:
         self.save_state()
+      
+      if self.e_state.converged:
+        print('Converged')
+        break
 
     self.logger.log_train_end(self.cfg)
     self.printer.train_end()
@@ -256,7 +267,7 @@ class Experiment:
     for data, target in data_loader:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       logits = self.model(data)
-      complexity = self.model.get_complexity(logits.device, self.cfg.complexity_type)
+      complexity = self.model.get_complexity(self.device, self.cfg.complexity_type)
       cross_entropy = self.risk_objective(logits, target, reduction='sum')
       cross_entropy_loss += cross_entropy.item()  # sum up batch loss
       total_loss, _, _ = self._make_train_loss(cross_entropy, complexity)

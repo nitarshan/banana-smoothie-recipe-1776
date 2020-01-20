@@ -8,14 +8,6 @@ from dataset_helpers import get_dataset_properties
 from experiment_config import DatasetType, ComplexityType, EConfig, ModelType
 from torchvision.models import resnet18
 
-def get_model_for_config(e_config: EConfig) -> nn.Module:
-  if e_config.model_type == ModelType.DEEP:
-    return DeepNet(e_config.model_shape, e_config.dataset_type)
-  elif e_config.model_type == ModelType.CONV:
-    return ConvNet(e_config.dataset_type)
-  elif e_config.model_type == ModelType.RESNET:
-    return ResNet(e_config.dataset_type)
-  raise KeyError
 
 class ExperimentBaseModel(nn.Module):
   def __init__(self, dataset_type: DatasetType):
@@ -51,6 +43,15 @@ class ExperimentBaseModel(nn.Module):
     elif complexity_type == ComplexityType.PATH_NORM:
       return self.path_norm(device)
     raise KeyError
+
+def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
+  if e_config.model_type == ModelType.DEEP:
+    return DeepNet(e_config.model_shape, e_config.dataset_type)
+  elif e_config.model_type == ModelType.CONV:
+    return ConvNet(e_config.dataset_type)
+  elif e_config.model_type == ModelType.RESNET:
+    return ResNet(e_config.dataset_type)
+  raise KeyError
 
 class DeepNet(ExperimentBaseModel):
   def __init__(self, hidden_sizes: List[int], dataset_type: DatasetType):

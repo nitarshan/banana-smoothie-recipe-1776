@@ -29,13 +29,13 @@ python run_experiment.py single \
 --model_width=30 \
 --model_depth=2 \
 --dataset_type='MNIST' \
---optimizer_type='SGD_MOMENTUM' \
---lr=0.05 \
+--optimizer_type='ADAM' \
+--lr=0.01 \
 --epochs=200 \
 --batch_size=100 \
 --complexity_type='L2' \
 --complexity_lambda=None \
---lagrangian_type='NONE' \
+--lagrangian_type='AUGMENTED' \
 --lagrangian_target=30 \
 --lagrangian_start_epoch=0 \
 --lagrangian_start_mu=1e-6 \
@@ -43,7 +43,7 @@ python run_experiment.py single \
 --lagrangian_patience_batches=250 \
 --lagrangian_improvement_rate=0.75 \
 --lagrangian_start_lambda=0 \
---lagrangian_lambda_omega=1e-3 \
+--lagrangian_lambda_omega=1e-6 \
 --comet_api_key=$COMET_API_KEY \
 --comet_tag='temp' \
 --use_cuda
