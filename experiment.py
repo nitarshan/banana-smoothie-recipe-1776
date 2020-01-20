@@ -160,7 +160,7 @@ class Experiment:
       if is_constrained:
         self._update_constraint_parameters()
       elif self.e_state.global_batch % self.cfg.lagrangian_patience_batches == 0:
-        self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance)
+        self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance, self.cfg.global_convergence_patience_windows)
 
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
@@ -169,7 +169,7 @@ class Experiment:
       if self.e_state.converged:
         break
 
-  def _check_convergence(self, tolerance) -> bool:
+  def _check_convergence(self, tolerance: float, convergence_patience: int) -> bool:
     loss = np.mean(self.e_state.loss_hist)
     if self.e_state.prev_loss is None:
       self.e_state.prev_loss = loss
@@ -180,9 +180,12 @@ class Experiment:
       self.logger.log_metrics(step=self.e_state.global_batch,
                               metrics={"minibatch/loss_improvement_rate": loss_improvement_rate})
       self.e_state.prev_loss = loss
-      return abs(loss_improvement_rate) < tolerance
+      self.e_state.convergence_test_hist.append(abs(loss_improvement_rate) < tolerance)
+      #print(loss_improvement_rate, sum(self.e_state.convergence_test_hist))
+      return sum(self.e_state.convergence_test_hist) >= convergence_patience
 
   def _update_constraint_parameters(self) -> None:
+    loss = np.mean(self.e_state.loss_hist)
     constraint = np.mean(self.e_state.constraint_hist)
 
     def _check_constraint_violated():
@@ -199,15 +202,15 @@ class Experiment:
 
     # Check if we have reached the end of a patience window and the constraint is still violated
     if _check_patience() and _check_constraint_violated():
-
       # Check if the subproblem has converged
-      if self.e_state.prev_constraint is not None and self._check_convergence(self.cfg.lagrangian_lambda_omega):
+      if self.e_state.prev_constraint is not None and self._check_convergence(self.cfg.lagrangian_convergence_tolerance, 1):
         if not _check_constrained_improved_sufficiently():
           # Update mu
           self.e_state.lagrangian_mu *= 10
           self.printer.mu_increase(self.e_state)
           self.scheduler = self._reset_scheduler()
           self.e_state.prev_loss = None
+          self.e_state.convergence_test_hist.clear()
         else:
           # Update lambda
           if self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
@@ -215,12 +218,12 @@ class Experiment:
             self.printer.lambda_increase(self.e_state)
             self.scheduler = self._reset_scheduler()
             self.e_state.prev_loss = None
+            self.e_state.convergence_test_hist.clear()
           self.e_state.constraint_to_beat = constraint
 
       self.e_state.prev_constraint = constraint
     elif _check_patience() and not _check_constraint_violated():
-      pass
-      self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance)
+      self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance, self.cfg.global_convergence_patience_windows)
 
     if self.e_state.lagrangian_mu > 1e10 or self.e_state.lagrangian_lambda > 1e10:
       raise InfeasibleException()

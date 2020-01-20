@@ -56,7 +56,7 @@ for optim in $optimizer; do
     --lagrangian_patience_batches=250 \
     --lagrangian_improvement_rate=0.75 \
     --lagrangian_start_lambda=0 \
-    --lagrangian_lambda_omega=1e-3 \
+    --lagrangian_convergence_tolerance=1e-3 \
     --comet_api_key=$COMET_API_KEY \
     --comet_tag='default_values_mnist_4' \
     --use_cuda &

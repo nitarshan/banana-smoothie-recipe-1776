@@ -61,6 +61,7 @@ class ETrainingState:
   constraint_hist: Deque[float] = deque([])
   constraint_to_beat = infty
   converged: bool = False
+  convergence_test_hist: Deque[bool] = deque([])
 
 # Configuration for the experiment
 @dataclass(frozen=True)
@@ -90,9 +91,10 @@ class EConfig:
   lagrangian_improvement_rate: Optional[float] = None
   ## Augmented Lagrangian Terms
   lagrangian_start_lambda: Optional[float] = None
-  lagrangian_lambda_omega: Optional[float] = None
+  lagrangian_convergence_tolerance: Optional[float] = None
   # Global Convergence
   global_convergence_tolerance: Optional[float] = None
+  global_convergence_patience_windows: Optional[int] = None
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = 100
   log_epoch_freq: Optional[int] = 20
@@ -121,7 +123,7 @@ class EConfig:
     if self.lagrangian_type == LagrangianType.AUGMENTED:
       if self.lagrangian_start_lambda is None:
         raise KeyError
-      if self.lagrangian_lambda_omega is None:
+      if self.lagrangian_convergence_tolerance is None:
         raise KeyError
 
   def to_tensorboard_dict(self) -> dict:
@@ -147,8 +149,8 @@ class EConfig:
       del d["lagrangian_improvement_rate"]
     if d["lagrangian_start_lambda"] is None:
       del d["lagrangian_start_lambda"]
-    if d["lagrangian_lambda_omega"] is None:
-      del d["lagrangian_lambda_omega"]
+    if d["lagrangian_convergence_tolerance"] is None:
+      del d["lagrangian_convergence_tolerance"]
     del d["log_batch_freq"]
     del d["save_epoch_freq"]
     del d["data_dir"]

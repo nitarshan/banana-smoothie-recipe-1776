@@ -36,15 +36,16 @@ python run_experiment.py single \
 --complexity_type='L2' \
 --complexity_lambda=None \
 --lagrangian_type='AUGMENTED' \
---lagrangian_target=300 \
+--lagrangian_target=3 \
 --lagrangian_start_epoch=0 \
 --lagrangian_start_mu=1e-6 \
 --lagrangian_tolerance=0.01 \
 --lagrangian_patience_batches=500 \
 --lagrangian_improvement_rate=0.75 \
 --lagrangian_start_lambda=0 \
---lagrangian_lambda_omega=1e-3 \
---global_convergence_tolerance=1e-6 \
+--lagrangian_convergence_tolerance=1e-3 \
+--global_convergence_tolerance=5e-6 \
+--global_convergence_patience_windows=2 \
 --comet_api_key=$COMET_API_KEY \
 --comet_tag='temp' \
 --use_cuda
