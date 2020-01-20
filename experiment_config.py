@@ -91,6 +91,8 @@ class EConfig:
   ## Augmented Lagrangian Terms
   lagrangian_start_lambda: Optional[float] = None
   lagrangian_lambda_omega: Optional[float] = None
+  # Global Convergence
+  global_convergence_tolerance: Optional[float] = None
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = 100
   log_epoch_freq: Optional[int] = 20

@@ -160,7 +160,7 @@ class Experiment:
       if is_constrained:
         self._update_constraint_parameters()
       elif self.e_state.global_batch % self.cfg.lagrangian_patience_batches == 0:
-        self.e_state.converged = self._check_convergence()
+        self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance)
 
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
@@ -169,7 +169,7 @@ class Experiment:
       if self.e_state.converged:
         break
 
-  def _check_convergence(self) -> bool:
+  def _check_convergence(self, tolerance) -> bool:
     loss = np.mean(self.e_state.loss_hist)
     if self.e_state.prev_loss is None:
       self.e_state.prev_loss = loss
@@ -180,7 +180,7 @@ class Experiment:
       self.logger.log_metrics(step=self.e_state.global_batch,
                               metrics={"minibatch/loss_improvement_rate": loss_improvement_rate})
       self.e_state.prev_loss = loss
-      return abs(loss_improvement_rate) < self.cfg.lagrangian_lambda_omega
+      return abs(loss_improvement_rate) < tolerance
 
   def _update_constraint_parameters(self) -> None:
     constraint = np.mean(self.e_state.constraint_hist)
@@ -201,7 +201,7 @@ class Experiment:
     if _check_patience() and _check_constraint_violated():
 
       # Check if the subproblem has converged
-      if self.e_state.prev_constraint is not None and self._check_convergence():
+      if self.e_state.prev_constraint is not None and self._check_convergence(self.cfg.lagrangian_lambda_omega):
         if not _check_constrained_improved_sufficiently():
           # Update mu
           self.e_state.lagrangian_mu *= 10
@@ -219,7 +219,8 @@ class Experiment:
 
       self.e_state.prev_constraint = constraint
     elif _check_patience() and not _check_constraint_violated():
-      self.e_state.converged = self._check_convergence()
+      pass
+      self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance)
 
     if self.e_state.lagrangian_mu > 1e10 or self.e_state.lagrangian_lambda > 1e10:
       raise InfeasibleException()
