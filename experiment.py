@@ -160,7 +160,7 @@ class Experiment:
       if is_constrained:
         self._update_constraint_parameters()
       elif self.e_state.global_batch % self.cfg.lagrangian_patience_batches == 0:
-        self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance, self.cfg.global_convergence_patience_windows)
+        self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance, self.cfg.global_convergence_patience_threshold)
 
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
@@ -223,7 +223,7 @@ class Experiment:
 
       self.e_state.prev_constraint = constraint
     elif _check_patience() and not _check_constraint_violated():
-      self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance, self.cfg.global_convergence_patience_windows)
+      self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance, self.cfg.global_convergence_patience_threshold)
 
     if self.e_state.lagrangian_mu > 1e10 or self.e_state.lagrangian_lambda > 1e10:
       raise InfeasibleException()

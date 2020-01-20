@@ -95,6 +95,7 @@ class EConfig:
   # Global Convergence
   global_convergence_tolerance: Optional[float] = None
   global_convergence_patience_windows: Optional[int] = None
+  global_convergence_patience_threshold: Optional[int] = None
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = 100
   log_epoch_freq: Optional[int] = 20
