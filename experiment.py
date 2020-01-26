@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from convergence_detection import ConvergeOnPlateau
 from dataset_helpers import get_dataloaders
 from experiment_config import (
   ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, LagrangianType, ModelType,
@@ -55,6 +56,7 @@ class Experiment:
     # Optimizer
     self.optimizer = self._reset_optimizer()
     self.scheduler = self._reset_scheduler()
+    self.detector = ConvergeOnPlateau(verbose=True)
 
     self.risk_objective = F.cross_entropy
 
@@ -160,7 +162,7 @@ class Experiment:
       if is_constrained:
         self._update_constraint_parameters()
       elif self.e_state.global_batch % self.cfg.lagrangian_patience_batches == 0:
-        self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance, self.cfg.global_convergence_patience_threshold)
+        self.e_state.converged = self.detector.step(np.mean(self.e_state.loss_hist))
 
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
@@ -223,7 +225,7 @@ class Experiment:
 
       self.e_state.prev_constraint = constraint
     elif _check_patience() and not _check_constraint_violated():
-      self.e_state.converged = self._check_convergence(self.cfg.global_convergence_tolerance, self.cfg.global_convergence_patience_threshold)
+      self.e_state.converged = self.detector.step(np.mean(self.e_state.loss_hist))
 
     if self.e_state.lagrangian_mu > 1e10 or self.e_state.lagrangian_lambda > 1e10:
       raise InfeasibleException()
