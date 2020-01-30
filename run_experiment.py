@@ -50,8 +50,7 @@ def single(
   lagrangian_start_lambda: Optional[float] = None,
   lagrangian_convergence_tolerance: Optional[float] = None,
   global_convergence_tolerance: Optional[float] = None,
-  global_convergence_patience_windows: Optional[int] = None,
-  global_convergence_patience_threshold: Optional[int] = None,
+  global_convergence_patience: Optional[int] = None,
   use_cuda: bool = True,
   comet_api_key: Optional[str] = None,
   comet_tag: Optional[str] = None,
@@ -94,8 +93,7 @@ def single(
     lagrangian_start_lambda=lagrangian_start_lambda,
     lagrangian_convergence_tolerance=lagrangian_convergence_tolerance,
     global_convergence_tolerance=global_convergence_tolerance,
-    global_convergence_patience_windows=global_convergence_patience_windows,
-    global_convergence_patience_threshold=global_convergence_patience_threshold,
+    global_convergence_patience=global_convergence_patience,
     log_dir=log_path,
     data_dir=data_path,
     checkpoint_dir=checkpoint_path,
@@ -107,7 +105,7 @@ def single(
     lagrangian_lambda=e_config.lagrangian_start_lambda,
     loss_hist=deque([], lagrangian_patience_batches or 1),
     constraint_hist=deque([], lagrangian_patience_batches or 1),
-    convergence_test_hist=deque([], global_convergence_patience_windows or 1),
+    convergence_test_hist=deque([], global_convergence_patience or 1),
   )
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')

@@ -1,16 +1,16 @@
 import time
-from typing import Optional
+from typing import Optional, Dict
 
 from comet_ml import Experiment as CometExperiment
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from experiment_config import EConfig, ETrainingState, LagrangianType, Verbosity, DatasetSubsetType, EvaluationMetrics
+from experiment_config import ComplexityType, EConfig, ETrainingState, LagrangianType, Verbosity, DatasetSubsetType, EvaluationMetrics
 
 
 class BaseLogger(object):
-  def log_metrics(self, step: int, metrics: dict):
+  def log_metrics(self, step: int, metrics: Dict[str, float]):
     raise NotImplementedError()
 
   def log_hparams(self, hps: dict, metrics: dict):
@@ -40,24 +40,25 @@ class BaseLogger(object):
       # Send metrics to logger
       self.log_metrics(step=state.global_batch, metrics=metrics)
   
-  def log_generalization_gap(self, state: ETrainingState, train_acc: float, val_acc: float, train_loss: float, val_loss: float) -> None:
+  def log_generalization_gap(self, state: ETrainingState, train_acc: float, val_acc: float, train_loss: float, val_loss: float, complexity: float, all_complexities: Dict[ComplexityType, float]) -> None:
     self.log_metrics(
       state.epoch,
       {
         'generalization/error': train_acc - val_acc,
         'generalization/loss': train_loss - val_loss,
+        'complexity': complexity,
+        **{'complexity/{}'.format(k.name): v for k,v in all_complexities.items()}
       })
   
-  def log_epoch_end(self, cfg: EConfig, state: ETrainingState, datasubset: DatasetSubsetType, avg_loss: float, acc: float, complexity: float):
+  def log_epoch_end(self, cfg: EConfig, state: ETrainingState, datasubset: DatasetSubsetType, avg_loss: float, acc: float) -> None:
     self.log_metrics(
       state.epoch,
       {
-        'complexity/{}/{}'.format(cfg.complexity_type.name, datasubset.name.lower()): complexity,
         'cross_entropy/{}'.format(datasubset.name.lower()): avg_loss,
         'accuracy/{}'.format(datasubset.name.lower()): acc,
       })
 
-  def log_train_end(self, cfg: EConfig):
+  def log_train_end(self, cfg: EConfig) -> None:
     self.log_hparams(cfg.to_tensorboard_dict(), {})
 
 class DefaultLogger(BaseLogger):

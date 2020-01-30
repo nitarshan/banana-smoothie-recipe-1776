@@ -56,7 +56,11 @@ class Experiment:
     # Optimizer
     self.optimizer = self._reset_optimizer()
     self.scheduler = self._reset_scheduler()
-    self.detector = ConvergeOnPlateau(verbose=True)
+    self.detector = ConvergeOnPlateau(
+      patience=e_config.global_convergence_patience,
+      threshold=e_config.global_convergence_tolerance,
+      verbose=False
+    )
 
     self.risk_objective = F.cross_entropy
 
@@ -243,7 +247,7 @@ class Experiment:
         val_eval = self.evaluate(DatasetSubsetType.VAL)
         train_eval = self.evaluate(DatasetSubsetType.TRAIN)
         
-        self.logger.log_generalization_gap(self.e_state, train_eval.acc.item(), val_eval.acc.item(), train_eval.avg_loss, val_eval.avg_loss)
+        self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
         self.printer.epoch_metrics(self.cfg, self.e_state, self.e_state.epoch, train_eval, val_eval)
 
       if self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0:
@@ -285,13 +289,13 @@ class Experiment:
 
     complexity = complexity.item()
     cross_entropy_loss /= num_to_evaluate_on
-    acc = num_correct / num_to_evaluate_on
-
-    self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc.item(), complexity)
+    acc = num_correct.item() / num_to_evaluate_on
 
     all_complexities = {}
     for c in ComplexityType:
       all_complexities[c] = self.model.get_complexity(self.device, c).item()
+
+    self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
 
     return EvaluationMetrics(acc, cross_entropy_loss, complexity, constraint_loss, num_correct, len(data_loader.dataset), all_complexities)
 
