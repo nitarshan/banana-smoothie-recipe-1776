@@ -14,14 +14,17 @@ from experiment_config import (
   ComplexityType, DatasetType, EConfig, ETrainingState, LagrangianType,
   ModelType, OptimizerType, Verbosity)
 
-def setup_paths(root_dir: str, experiment_id: int) -> Tuple[Path, Path, Path, Path]:
+def setup_paths(root_dir: str, experiment_id: int, data_dir: Optional[str]) -> Tuple[Path, Path, Path, Path]:
   print('[Experiment {}] Setting up directories'.format(experiment_id))
   root_path = Path(root_dir)
   results_path = root_path / 'results'
   results_path.mkdir(parents=True, exist_ok=True)
   log_path = root_path / 'logs'
-  data_path = root_path / 'data'
-  data_path.mkdir(parents=True, exist_ok=True)
+  if data_dir is None:
+    data_path = root_path / 'data'
+    data_path.mkdir(parents=True, exist_ok=True)
+  else:
+    data_path = Path(data_dir)
   checkpoint_path = root_path / 'checkpoints'
   checkpoint_path.mkdir(parents=True, exist_ok=True)
   print('[Experiment {}] Results path {}'.format(experiment_id, results_path))
@@ -59,12 +62,13 @@ def single(
   save_epoch_freq: Optional[int] = None,
   seed: Optional[int] = None,
   data_seed: Optional[int] = None,
+  data_dir: Optional[str] = None,
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
   print("[Experiment {}] CUDA devices:".format(experiment_id), torch.cuda.device_count())
 
-  results_path, log_path, data_path, checkpoint_path = setup_paths(root_dir, experiment_id)
+  results_path, log_path, data_path, checkpoint_path = setup_paths(root_dir, experiment_id, data_dir)
 
   if seed is None:
     seed = experiment_id % (2**32)
