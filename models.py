@@ -1,5 +1,6 @@
 from typing import List
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,33 +18,6 @@ class ExperimentBaseModel(nn.Module):
   def forward(self, x) -> torch.Tensor:
     raise NotImplementedError
 
-  def get_flat_params(self) -> torch.Tensor:
-    return torch.cat([p.view(-1) for p in self.parameters()], dim=0)
-  
-  def path_norm(self, device: torch.device) -> torch.Tensor:
-    raise NotImplementedError
-
-  def get_complexity(self, device: torch.device, complexity_type: ComplexityType) -> torch.Tensor:
-    def prod_of_fro():
-      return torch.prod(torch.cat([p.norm('fro').unsqueeze(0) ** 2 for p in self.parameters()]))
-    def param_norm():
-      return torch.sum(torch.cat([p.norm('fro').unsqueeze(0) ** 2 for p in self.parameters()]))
-      
-    if complexity_type == ComplexityType.NONE:
-      return torch.zeros((1,), device=device)
-    elif complexity_type == ComplexityType.L2:
-      return torch.norm(self.get_flat_params(), p=2)
-    elif complexity_type == ComplexityType.PROD_OF_FRO:
-      return prod_of_fro()
-    elif complexity_type == ComplexityType.SUM_OF_FRO:
-      d = len(list(self.parameters()))
-      return d * prod_of_fro() ** (1/d)
-    elif complexity_type == ComplexityType.PARAM_NORM:
-      return param_norm()
-    elif complexity_type == ComplexityType.PATH_NORM:
-      return self.path_norm(device)
-    raise KeyError
-
 def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
   if e_config.model_type == ModelType.DEEP:
     return DeepNet(e_config.model_shape, e_config.dataset_type)
@@ -58,23 +32,15 @@ class DeepNet(ExperimentBaseModel):
     super().__init__(dataset_type)
     self.hidden_size = hidden_sizes
     self.layers = nn.ModuleList(
-      [nn.Linear(self.dataset_properties.D, hidden_sizes[0])] + # Input
+      [nn.Linear(np.prod(self.dataset_properties.D), hidden_sizes[0])] + # Input
       [nn.Linear(hidden_sizes[i], hidden_sizes[i+1]) for i in range(len(hidden_sizes)-1)] + # Hidden
       [nn.Linear(hidden_sizes[-1], self.dataset_properties.K)]) # Output
 
   def forward(self, x) -> torch.Tensor:
-    x = x.view(-1,self.dataset_properties.D)
+    x = x.view(-1, np.prod(self.dataset_properties.D))
     for layer in self.layers[:-1]:
       x = F.relu(layer(x))
     x = self.layers[-1](x)
-    return x
-  
-  def path_norm(self, device: torch.device) -> torch.Tensor:
-    x = torch.ones((1,self.dataset_properties.D), device=device)
-    for layer in self.layers[:-1]:
-      x = F.relu(F.linear(x, layer.weight ** 2, layer.bias ** 2))
-    x = F.linear(x, self.layers[-1].weight ** 2, self.layers[-1].bias ** 2)
-    x = torch.sqrt(torch.sum(x))
     return x
 
 # https://github.com/pytorch/tutorials/blob/master/beginner_source/blitz/cifar10_tutorial.py
@@ -97,19 +63,6 @@ class ConvNet(ExperimentBaseModel):
     x = self.fc3(x)
     return x
 
-  def path_norm(self, device: torch.device) -> torch.Tensor:
-    x = torch.ones((1,self.dataset_properties.D), device=device)
-    x = F.conv2d(input, self.conv1.weight ** 2, self.conv1.bias ** 2, self.conv1.stride, self.conv1.padding, self.conv1.dilation, self.conv1.groups)
-    x = self.pool(F.relu(x))
-    x = F.conv2d(input, self.conv2.weight ** 2, self.conv2.bias ** 2, self.conv2.stride, self.conv2.padding, self.conv2.dilation, self.conv2.groups)
-    x = self.pool(F.relu(x))
-    x = x.view(-1, 16 * 5 * 5)
-    x = F.relu(F.linear(x, self.fc1.weight ** 2, self.fc1.bias ** 2))
-    x = F.relu(F.linear(x, self.fc2.weight ** 2, self.fc2.bias ** 2))
-    x = F.linear(x, self.fc3.weight ** 2, self.fc3.bias ** 2)
-    x = torch.sqrt(torch.sum(x))
-    return x
-
 # https://gist.github.com/y0ast/d91d09565462125a1eb75acc65da1469
 class ResNet(ExperimentBaseModel):
   def __init__(self, dataset_type: DatasetType):
@@ -118,7 +71,7 @@ class ResNet(ExperimentBaseModel):
     self.resnet.conv1 = torch.nn.Conv2d(
         3, 64, kernel_size=3, stride=1, padding=1, bias=False
     )
-    self.resnet.maxpool = torch.nn.Identity()
+    self.resnet.maxpool = nn.Identity()
 
   def forward(self, x) -> torch.Tensor:
     return self.resnet(x)

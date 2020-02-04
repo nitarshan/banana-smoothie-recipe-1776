@@ -28,6 +28,9 @@ class ComplexityType(Enum):
   SUM_OF_FRO = 4
   PARAM_NORM = 5
   PATH_NORM = 6
+  PARAMS = 7
+  PROD_OF_SPEC = 8
+  SUM_OF_SPEC = 9
 
 class OptimizerType(Enum):
   SGD = 1

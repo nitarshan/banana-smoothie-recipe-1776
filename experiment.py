@@ -1,3 +1,4 @@
+from measures import get_measure
 from typing import Optional, Tuple
 
 import numpy as np
@@ -147,7 +148,7 @@ class Experiment:
       self.optimizer.zero_grad()
       
       logits = self.model(data)
-      complexity = self.model.get_complexity(logits.device, self.cfg.complexity_type)
+      complexity = get_measure(self.model, self.cfg.complexity_type, self.device)
       cross_entropy = self.risk_objective(logits, target)
 
       # Assemble the loss function based on the optimization method
@@ -236,6 +237,7 @@ class Experiment:
 
   def train(self) -> Tuple[EvaluationMetrics, EvaluationMetrics]:
     self.printer.train_start(self.device)
+    train_eval ,val_eval = None, None
     
     self.e_state.global_batch = 0
     for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
@@ -259,8 +261,10 @@ class Experiment:
 
     self.logger.log_train_end(self.cfg)
     self.printer.train_end()
-
     del self.logger
+
+    if train_eval is None or val_eval is None:
+      raise RuntimeError
     return val_eval, train_eval
 
   @torch.no_grad()
@@ -277,7 +281,7 @@ class Experiment:
     for data, target in data_loader:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       logits = self.model(data)
-      complexity = self.model.get_complexity(self.device, self.cfg.complexity_type)
+      complexity = get_measure(self.model, self.cfg.complexity_type, self.device)
       cross_entropy = self.risk_objective(logits, target, reduction='sum')
       cross_entropy_loss += cross_entropy.item()  # sum up batch loss
       total_loss, _, _ = self._make_train_loss(cross_entropy, complexity)
@@ -293,7 +297,8 @@ class Experiment:
 
     all_complexities = {}
     for c in ComplexityType:
-      all_complexities[c] = self.model.get_complexity(self.device, c).item()
+      if c != ComplexityType.NONE:
+        all_complexities[c] = get_measure(self.model, c, self.device).item()
 
     self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
 
