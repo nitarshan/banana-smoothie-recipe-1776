@@ -31,6 +31,7 @@ class ComplexityType(Enum):
   PARAMS = 7
   PROD_OF_SPEC = 8
   SUM_OF_SPEC = 9
+  FRO_DIST = 10
 
 class OptimizerType(Enum):
   SGD = 1

@@ -30,10 +30,10 @@ for lr in $lrs; do
 let "global_idx++"
 python run_experiment.py single \
 --root_dir=$SLURM_TMPDIR \
---model_type='DEEP' \
+--model_type='CONV' \
 --model_width=30 \
 --model_depth=2 \
---dataset_type='MNIST' \
+--dataset_type='CIFAR10' \
 --optimizer_type='ADAM' \
 --lr=$lr \
 --epochs=1000 \

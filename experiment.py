@@ -1,3 +1,4 @@
+from copy import deepcopy
 from measures import get_measure
 from typing import Optional, Tuple
 
@@ -53,6 +54,7 @@ class Experiment:
     self.model = get_model_for_config(self.cfg)
     print("Number of parameters", sum(p.numel() for p in self.model.parameters() if p.requires_grad))
     self.model.to(device)
+    self.init_model = deepcopy(self.model)
 
     # Optimizer
     self.optimizer = self._reset_optimizer()
@@ -148,7 +150,7 @@ class Experiment:
       self.optimizer.zero_grad()
       
       logits = self.model(data)
-      complexity = get_measure(self.model, self.cfg.complexity_type, self.device)
+      complexity = get_measure(self.model, self.init_model, self.cfg.complexity_type, self.device)
       cross_entropy = self.risk_objective(logits, target)
 
       # Assemble the loss function based on the optimization method
@@ -248,7 +250,7 @@ class Experiment:
       if epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0 or self.e_state.converged:
         val_eval = self.evaluate(DatasetSubsetType.VAL)
         train_eval = self.evaluate(DatasetSubsetType.TRAIN)
-        
+        #print(train_eval.all_complexities)
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
         self.printer.epoch_metrics(self.cfg, self.e_state, self.e_state.epoch, train_eval, val_eval)
 
@@ -281,7 +283,7 @@ class Experiment:
     for data, target in data_loader:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       logits = self.model(data)
-      complexity = get_measure(self.model, self.cfg.complexity_type, self.device)
+      complexity = get_measure(self.model, self.init_model, self.cfg.complexity_type, self.device)
       cross_entropy = self.risk_objective(logits, target, reduction='sum')
       cross_entropy_loss += cross_entropy.item()  # sum up batch loss
       total_loss, _, _ = self._make_train_loss(cross_entropy, complexity)
@@ -298,7 +300,7 @@ class Experiment:
     all_complexities = {}
     for c in ComplexityType:
       if c != ComplexityType.NONE:
-        all_complexities[c] = get_measure(self.model, c, self.device).item()
+        all_complexities[c] = get_measure(self.model, self.init_model, c, self.device).item()
 
     self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
 

@@ -29,8 +29,20 @@ def _spec_norm(weights: List[torch.nn.Parameter]):
   weight_norms = torch.cat([p.svd()[1].max().unsqueeze(0) for p in weights])
   return weight_norms.log().sum().exp()
 
-def get_measure(model: ExperimentBaseModel, measure_type: ComplexityType, device: torch.device) -> torch.Tensor:
+def _fft_spec_norm(weights: List[torch.nn.Parameter]):
+  weight_norms = torch.cat([p.svd()[1].max().unsqueeze(0) for p in weights])
+  return weight_norms.log().sum().exp()
+
+def _fro_dist(weights: List[torch.nn.Parameter], init_weights: List[torch.nn.Parameter]):
+  weight_norms = torch.cat([
+    (p - q).norm('fro').unsqueeze(0) ** 2
+    for p, q in zip(weights, init_weights)])
+  return weight_norms.sum()
+
+def get_measure(model: ExperimentBaseModel, init_model: ExperimentBaseModel, measure_type: ComplexityType, device: torch.device) -> torch.Tensor:
   weights_only = [p for name, p in model.named_parameters() if 'bias' not in name]
+  init_weights_only = [p for name, p in init_model.named_parameters() if 'bias' not in name]
+  d = len(weights_only)
 
   if measure_type == ComplexityType.NONE:
     return torch.zeros((1,), device=device)
@@ -40,7 +52,6 @@ def get_measure(model: ExperimentBaseModel, measure_type: ComplexityType, device
   elif measure_type == ComplexityType.PROD_OF_FRO:
     return _prod_of_fro(weights_only)
   elif measure_type == ComplexityType.SUM_OF_FRO:
-    d = len(weights_only)
     return d * _prod_of_fro(weights_only) ** (1/d)
   elif measure_type == ComplexityType.PARAM_NORM:
     return _param_norm(weights_only)
@@ -51,6 +62,7 @@ def get_measure(model: ExperimentBaseModel, measure_type: ComplexityType, device
   elif measure_type == ComplexityType.PROD_OF_SPEC:
     return _spec_norm(weights_only)
   elif measure_type == ComplexityType.SUM_OF_SPEC:
-    d = len(weights_only)
     return d * _spec_norm(weights_only) ** (1/d)
+  elif measure_type == ComplexityType.FRO_DIST:
+    return _fro_dist(weights_only, init_weights_only)
   raise KeyError
