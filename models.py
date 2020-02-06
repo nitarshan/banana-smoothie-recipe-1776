@@ -47,7 +47,7 @@ class DeepNet(ExperimentBaseModel):
 class ConvNet(ExperimentBaseModel):
   def __init__(self, dataset_type: DatasetType):
     super().__init__(dataset_type)
-    self.conv1 = nn.Conv2d(3, 6, kernel_size=5)
+    self.conv1 = nn.Conv2d(self.dataset_properties.D[0], 6, kernel_size=5)
     self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
     self.conv2 = nn.Conv2d(6, 16, kernel_size=5)
     self.fc1 = nn.Linear(16 * 5 * 5, 120)

@@ -30,10 +30,10 @@ for lr in $lrs; do
 let "global_idx++"
 python run_experiment.py single \
 --root_dir=$SLURM_TMPDIR \
---model_type='CONV' \
+--model_type='DEEP' \
 --model_width=30 \
 --model_depth=2 \
---dataset_type='CIFAR10' \
+--dataset_type='MNIST' \
 --optimizer_type='ADAM' \
 --lr=$lr \
 --epochs=1000 \
@@ -48,9 +48,11 @@ python run_experiment.py single \
 --lagrangian_patience_batches=200 \
 --lagrangian_improvement_rate=0.75 \
 --lagrangian_start_lambda=0 \
+--global_convergence_method='min' \
 --lagrangian_convergence_tolerance=1e-4 \
 --global_convergence_tolerance=1e-8 \
 --global_convergence_patience=30 \
+--global_convergence_target=0.1 \
 --comet_api_key=$COMET_API_KEY \
 --comet_tag='lr_test_7' \
 --log_epoch_freq=20 \

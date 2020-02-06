@@ -7,10 +7,11 @@ class ConvergeOnPlateau(object):
     seen for a 'patience' number of epochs, convergence is declared.
 
     Args:
-        mode (str): One of `min`, `max`. In `min` mode, convergence is
+        mode (str): One of `min`, `max`, `eq`. In `min` mode, convergence is
             declared when the quantity monitored has stopped
             decreasing; in `max` mode it will be declared when the
-            quantity monitored has stopped increasing. Default: 'min'.
+            quantity monitored has stopped increasing; in `leq` mode it will
+            be declared when the quanitity is less than or equal to a target. Default: 'min'.
         patience (int): Number of epochs with no improvement after
             which convergence is declared. For example, if
             `patience = 2`, then we will ignore the first 2 epochs
@@ -39,7 +40,7 @@ class ConvergeOnPlateau(object):
 
     def __init__(self, mode='min', patience=10,
                  verbose=False, threshold=1e-4, threshold_mode='rel',
-                 cooldown=0):
+                 cooldown=0, target=None):
 
         self.patience = patience
         self.verbose = verbose
@@ -48,12 +49,13 @@ class ConvergeOnPlateau(object):
         self.mode = mode
         self.threshold = threshold
         self.threshold_mode = threshold_mode
+        self.target = target
         self.best = None
         self.num_bad_epochs = None
         self.mode_worse = None  # the worse value for the chosen mode
         self.last_epoch = 0
         self._init_is_better(mode=mode, threshold=threshold,
-                             threshold_mode=threshold_mode)
+                             threshold_mode=threshold_mode, target=target)
         self._reset()
 
     def _reset(self):
@@ -69,23 +71,27 @@ class ConvergeOnPlateau(object):
         self.last_epoch = epoch
         converged = False
 
-        if self.is_better(current, self.best):
-            self.best = current
-            self.num_bad_epochs = 0
+        if self.mode == 'leq':
+            if current <= self.target:
+                converged = True
         else:
-            self.num_bad_epochs += 1
+            if self.is_better(current, self.best):
+                self.best = current
+                self.num_bad_epochs = 0
+            else:
+                self.num_bad_epochs += 1
 
-        if self.in_cooldown:
-            self.cooldown_counter -= 1
-            self.num_bad_epochs = 0  # ignore any bad epochs in cooldown
+            if self.in_cooldown:
+                self.cooldown_counter -= 1
+                self.num_bad_epochs = 0  # ignore any bad epochs in cooldown
 
-        if self.num_bad_epochs > self.patience:
-            converged = True
-            self.cooldown_counter = self.cooldown
-            self.num_bad_epochs = 0
-        
-        if self.verbose:
-            print(self.best, current, self.num_bad_epochs)
+            if self.num_bad_epochs > self.patience:
+                converged = True
+                self.cooldown_counter = self.cooldown
+                self.num_bad_epochs = 0
+            
+            if self.verbose:
+                print(self.best, current, self.num_bad_epochs)
         
         return converged
 
@@ -108,8 +114,8 @@ class ConvergeOnPlateau(object):
         else:  # mode == 'max' and epsilon_mode == 'abs':
             return a > best + self.threshold
 
-    def _init_is_better(self, mode, threshold, threshold_mode):
-        if mode not in {'min', 'max'}:
+    def _init_is_better(self, mode, threshold, threshold_mode, target):
+        if mode not in {'min', 'max', 'leq'}:
             raise ValueError('mode ' + mode + ' is unknown!')
         if threshold_mode not in {'rel', 'abs'}:
             raise ValueError('threshold mode ' + threshold_mode + ' is unknown!')
@@ -118,10 +124,14 @@ class ConvergeOnPlateau(object):
             self.mode_worse = inf
         else:  # mode == 'max':
             self.mode_worse = -inf
+        
+        if mode =='leq' and target is None:
+            raise ValueError('leq mode requires target specification!')
 
         self.mode = mode
         self.threshold = threshold
         self.threshold_mode = threshold_mode
+        self.target = target
 
     def state_dict(self):
         return {key: value for key, value in self.__dict__.items() if key != 'optimizer'}

@@ -17,7 +17,7 @@ class DatasetProperties:
 
 def get_dataset_properties(dataset_name: DatasetType) -> DatasetProperties:
   if dataset_name == DatasetType.MNIST:
-    return DatasetProperties(DatasetType.MNIST, [28, 28], 10)
+    return DatasetProperties(DatasetType.MNIST, [1, 28, 28], 10)
   elif dataset_name == DatasetType.CIFAR10:
     return DatasetProperties(DatasetType.CIFAR10, [3, 32, 32], 10)
   elif dataset_name == DatasetType.CIFAR100:

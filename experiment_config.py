@@ -32,6 +32,8 @@ class ComplexityType(Enum):
   PROD_OF_SPEC = 8
   SUM_OF_SPEC = 9
   FRO_DIST = 10
+  PACBAYES_BOUND = 11
+  PACBAYES_SHARPNESS = 12
 
 class OptimizerType(Enum):
   SGD = 1
@@ -97,8 +99,10 @@ class EConfig:
   lagrangian_start_lambda: Optional[float] = None
   lagrangian_convergence_tolerance: Optional[float] = None
   # Global Convergence
+  global_convergence_method: Optional[str] = None
   global_convergence_tolerance: Optional[float] = None
   global_convergence_patience: Optional[int] = None
+  global_convergence_target: Optional[float] = None
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = 100
   log_epoch_freq: Optional[int] = 20

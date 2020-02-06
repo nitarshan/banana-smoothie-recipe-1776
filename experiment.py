@@ -60,8 +60,10 @@ class Experiment:
     self.optimizer = self._reset_optimizer()
     self.scheduler = self._reset_scheduler()
     self.detector = ConvergeOnPlateau(
+      mode=e_config.global_convergence_method,
       patience=e_config.global_convergence_patience,
       threshold=e_config.global_convergence_tolerance,
+      target=e_config.global_convergence_target,
       verbose=False
     )
 
@@ -300,7 +302,7 @@ class Experiment:
     all_complexities = {}
     for c in ComplexityType:
       if c != ComplexityType.NONE:
-        all_complexities[c] = get_measure(self.model, self.init_model, c, self.device).item()
+        all_complexities[c] = get_measure(self.model, self.init_model, c, self.device, data_loader, acc).item()
 
     self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
 
