@@ -123,7 +123,7 @@ def single(
       'final_results_val': val_eval,
       'final_results_train': train_eval,
     }
-    with open(results_path / '{}.{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
+    with open(results_path / '{}.epoch{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
       pickle.dump(results, results_file)
 
   print('[Experiment {}]'.format(experiment_id), e_config)
