@@ -26,7 +26,7 @@ class NanLossException(Exception):
 
 class Experiment:
   def __init__(self, e_state: ETrainingState, device: torch.device, e_config: Optional[EConfig]=None,
-               logger: Optional[BaseLogger]=None):
+               logger: Optional[BaseLogger]=None, result_save_callback: Optional[object]=None):
     self.e_state = e_state
     self.device = device
     resume_from_checkpoint = (e_config is None) or e_config.resume_from_checkpoint
@@ -49,6 +49,7 @@ class Experiment:
       self.logger = logger
     # Printing
     self.printer = Printer(self.e_state.id, self.cfg.verbosity)
+    self.result_save_callback = result_save_callback
 
     # Model
     self.model = get_model_for_config(self.cfg)
@@ -255,6 +256,7 @@ class Experiment:
         #print(train_eval.all_complexities)
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
         self.printer.epoch_metrics(self.cfg, self.e_state, self.e_state.epoch, train_eval, val_eval)
+        self.result_save_callback(epoch, val_eval, train_eval)
 
       if self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0:
         self.save_state()

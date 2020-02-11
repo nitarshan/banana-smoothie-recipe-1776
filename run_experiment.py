@@ -115,20 +115,22 @@ def single(
     constraint_hist=deque([], lagrangian_patience_batches or 1),
     convergence_test_hist=deque([], global_convergence_patience or 1),
   )
+
+  def dump_results(epoch, val_eval, train_eval):
+    results = {
+      'e_state': e_state,
+      'e_config': e_config,
+      'final_results_val': val_eval,
+      'final_results_train': train_eval,
+    }
+    with open(results_path / '{}.{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
+      pickle.dump(results, results_file)
+
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
   if logger is None and comet_api_key is not None:
     logger = CometLogger(comet_api_key, comet_tag, e_config.to_tensorboard_dict())
-  val_eval, train_eval = Experiment(e_state, device, e_config, logger).train()
-
-  results = {
-    'e_state': e_state,
-    'e_config': e_config,
-    'final_results_val': val_eval,
-    'final_results_train': train_eval,
-  }
-  with open(results_path / '{}.pkl'.format(experiment_id), mode='wb') as results_file:
-    pickle.dump(results, results_file)
+  val_eval, train_eval = Experiment(e_state, device, e_config, logger, dump_results).train()
 
 if __name__ == '__main__':
   try:
