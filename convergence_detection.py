@@ -7,7 +7,7 @@ class ConvergeOnPlateau(object):
     seen for a 'patience' number of epochs, convergence is declared.
 
     Args:
-        mode (str): One of `min`, `max`, `eq`. In `min` mode, convergence is
+        mode (str): One of `min`, `max`, `leq`. In `min` mode, convergence is
             declared when the quantity monitored has stopped
             decreasing; in `max` mode it will be declared when the
             quantity monitored has stopped increasing; in `leq` mode it will
