@@ -3,7 +3,7 @@ from numpy import infty
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Deque, Optional
+from typing import Deque, Dict, NamedTuple, Optional, List
 from collections import deque
 
 class DatasetType(Enum):
@@ -19,6 +19,7 @@ class DatasetSubsetType(IntEnum):
 class ModelType(Enum):
   DEEP = 1
   CONV = 2
+  RESNET = 3
 
 class ComplexityType(Enum):
   NONE = 1
@@ -27,6 +28,12 @@ class ComplexityType(Enum):
   SUM_OF_FRO = 4
   PARAM_NORM = 5
   PATH_NORM = 6
+  PARAMS = 7
+  PROD_OF_SPEC = 8
+  SUM_OF_SPEC = 9
+  FRO_DIST = 10
+  PACBAYES_BOUND = 11
+  PACBAYES_SHARPNESS = 12
 
 class OptimizerType(Enum):
   SGD = 1
@@ -57,15 +64,20 @@ class ETrainingState:
   prev_acc: Optional[float] = None
   prev_constraint: Optional[float] = None
   loss_hist: Deque[float] = deque([])
+  constraint_hist: Deque[float] = deque([])
   constraint_to_beat = infty
+  converged: bool = False
+  convergence_test_hist: Deque[bool] = deque([])
 
 # Configuration for the experiment
 @dataclass(frozen=True)
 class EConfig:
   seed: int
+  data_seed: Optional[int]
   use_cuda: bool
   # Model
   model_type: ModelType
+  model_shape: List[int]
   # Dataset
   dataset_type: DatasetType
   # Training
@@ -85,10 +97,15 @@ class EConfig:
   lagrangian_improvement_rate: Optional[float] = None
   ## Augmented Lagrangian Terms
   lagrangian_start_lambda: Optional[float] = None
-  lagrangian_lambda_omega: Optional[float] = None
+  lagrangian_convergence_tolerance: Optional[float] = None
+  # Global Convergence
+  global_convergence_method: Optional[str] = None
+  global_convergence_tolerance: Optional[float] = None
+  global_convergence_patience: Optional[int] = None
+  global_convergence_target: Optional[float] = None
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = 100
-  log_epoch_freq: Optional[int] = 10
+  log_epoch_freq: Optional[int] = 20
   save_epoch_freq: Optional[int] = None
   data_dir: Path = Path('data')
   log_dir: Path = Path('logs')
@@ -114,7 +131,7 @@ class EConfig:
     if self.lagrangian_type == LagrangianType.AUGMENTED:
       if self.lagrangian_start_lambda is None:
         raise KeyError
-      if self.lagrangian_lambda_omega is None:
+      if self.lagrangian_convergence_tolerance is None:
         raise KeyError
 
   def to_tensorboard_dict(self) -> dict:
@@ -140,8 +157,8 @@ class EConfig:
       del d["lagrangian_improvement_rate"]
     if d["lagrangian_start_lambda"] is None:
       del d["lagrangian_start_lambda"]
-    if d["lagrangian_lambda_omega"] is None:
-      del d["lagrangian_lambda_omega"]
+    if d["lagrangian_convergence_tolerance"] is None:
+      del d["lagrangian_convergence_tolerance"]
     del d["log_batch_freq"]
     del d["save_epoch_freq"]
     del d["data_dir"]
@@ -151,3 +168,12 @@ class EConfig:
     del d["verbosity"]
 
     return d
+
+class EvaluationMetrics(NamedTuple):
+  acc: float
+  avg_loss: float
+  complexity: float
+  complexity_loss: float
+  num_correct: int
+  num_to_evaluate_on: int
+  all_complexities: Dict[ComplexityType, float]
