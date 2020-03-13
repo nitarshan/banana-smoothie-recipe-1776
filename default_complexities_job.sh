@@ -5,19 +5,19 @@
 #SBATCH --gres=gpu:titanxp:1
 #SBATCH --mem=20G
 #SBATCH --time=24:00:00
-#SBATCH --output /network/tmp1/rajkuman/slurm-%j.out
-#SBATCH --error /network/tmp1/rajkuman/slurm-error-%j.out
+#SBATCH --output /network/tmp1/$USER/slurm-%j.out
+#SBATCH --error /network/tmp1/$USER/slurm-error-%j.out
 
 # 1. Load your environment
-source /network/home/rajkuman/.bashrc
+source /network/home/$USER/.bashrc
 module purge
 module load anaconda/3
 source $CONDA_ACTIVATE
 conda activate ccm
 
 # 2. Prepare directories and copy dataset onto the compute node
-mkdir -p /network/tmp1/rajkuman/logs
-mkdir -p /network/tmp1/rajkuman/results
+mkdir -p /network/tmp1/$USER/logs
+mkdir -p /network/tmp1/$USER/results
 mkdir -p $SLURM_TMPDIR/data/MNIST/
 mkdir $SLURM_TMPDIR/logs
 mkdir $SLURM_TMPDIR/checkpoints
@@ -62,15 +62,15 @@ for optim in $optimizer; do
     --use_cuda &
     if (( $global_idx % $jobs_per_gpu == 0 )); then
       wait
-      rsync -r $SLURM_TMPDIR/results/ /network/tmp1/rajkuman/results
+      rsync -r $SLURM_TMPDIR/results/ /network/tmp1/$USER/results
     fi
   done
 done
 done
 done
 wait
-rsync -r $SLURM_TMPDIR/results/ /network/tmp1/rajkuman/results
+rsync -r $SLURM_TMPDIR/results/ /network/tmp1/$USER/results
 
 # 4. To do on your local machine (not login)
 # mkdir -p results/verify_lagrangian
-# rsync -a --ignore-existing mila:/network/tmp1/rajkuman/results/ ./results/verify_lagrangian
+# rsync -a --ignore-existing mila:/network/tmp1/$USER/results/ ./results/verify_lagrangian

@@ -1,6 +1,6 @@
 # 1. Load your environment
 echo 'Load Environment'
-source /network/home/rajkuman/.bashrc
+source /network/home/$USER/.bashrc
 module purge
 module load anaconda/3
 source $CONDA_ACTIVATE
@@ -8,7 +8,7 @@ conda activate ccm
 
 # 2. Prepare directories and copy dataset onto the compute node
 echo 'Loading Datasets'
-mkdir -p /network/tmp1/rajkuman/results
+mkdir -p /network/tmp1/$USER/results
 mkdir -p $SLURM_TMPDIR/data/MNIST/
 mkdir $SLURM_TMPDIR/results
 cp -r /network/data1/mnist/processed $SLURM_TMPDIR/data/MNIST/
