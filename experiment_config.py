@@ -1,10 +1,11 @@
-from numpy import infty
-
+from collections import deque
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Deque, Dict, NamedTuple, Optional, List
-from collections import deque
+from typing import Deque, Dict, List, NamedTuple, Optional
+
+from numpy import infty
+
 
 class DatasetType(Enum):
   MNIST = 1
@@ -32,8 +33,49 @@ class ComplexityType(Enum):
   PROD_OF_SPEC = 8
   SUM_OF_SPEC = 9
   FRO_DIST = 10
-  PACBAYES_BOUND = 11
-  PACBAYES_SHARPNESS = 12
+  PACBAYES_ORIG = 11
+  PACBAYES_INIT = 12
+  PACBAYES_MAG_ORIG = 13
+  PACBAYES_MAG_INIT = 14
+  PACBAYES_FLATNESS = 15
+  PACBAYES_MAG_FLATNESS = 16
+  FRO_OVER_SPEC = 17
+  DIST_SPEC_INIT = 18
+  INVERSE_MARGIN = 19
+  PROD_OF_FRO_OVER_MARGIN = 20
+  SUM_OF_FRO_OVER_MARGIN = 21
+  PROD_OF_SPEC_OVER_MARGIN = 22
+  SUM_OF_SPEC_OVER_MARGIN = 23
+  PATH_NORM_OVER_MARGIN = 24
+  L2_DIST = 25
+
+  @classmethod
+  def data_dependent_measures(cls):
+    return {
+      cls.PACBAYES_ORIG,
+      cls.PACBAYES_INIT,
+      cls.PACBAYES_MAG_ORIG,
+      cls.PACBAYES_MAG_INIT,
+      cls.PACBAYES_FLATNESS,
+      cls.PACBAYES_MAG_FLATNESS,
+      cls.INVERSE_MARGIN,
+      cls.PROD_OF_FRO_OVER_MARGIN,
+      cls.SUM_OF_FRO_OVER_MARGIN,
+      cls.PROD_OF_SPEC_OVER_MARGIN,
+      cls.SUM_OF_SPEC_OVER_MARGIN,
+      cls.PATH_NORM_OVER_MARGIN,
+    }
+
+  @classmethod
+  def acc_dependent_measures(cls):
+    return {
+      cls.PACBAYES_ORIG,
+      cls.PACBAYES_INIT,
+      cls.PACBAYES_MAG_ORIG,
+      cls.PACBAYES_MAG_INIT,
+      cls.PACBAYES_FLATNESS,
+      cls.PACBAYES_MAG_FLATNESS,
+    }
 
 class OptimizerType(Enum):
   SGD = 1
