@@ -24,7 +24,10 @@ def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
   elif e_config.model_type == ModelType.CONV:
     return ConvNet(e_config.dataset_type)
   elif e_config.model_type == ModelType.RESNET:
-    return ResNet(e_config.dataset_type)
+    depth = e_config.model_shape[0]
+    width = e_config.model_shape[1]
+    stack_planes = e_config.model_shape[2:]
+    return ResNet(e_config.dataset_type, depth, width, stack_planes)
   raise KeyError
 
 class DeepNet(ExperimentBaseModel):
@@ -63,15 +66,87 @@ class ConvNet(ExperimentBaseModel):
     x = self.fc3(x)
     return x
 
-# https://gist.github.com/y0ast/d91d09565462125a1eb75acc65da1469
-class ResNet(ExperimentBaseModel):
-  def __init__(self, dataset_type: DatasetType):
-    super().__init__(dataset_type)
-    self.resnet = resnet18(pretrained=False, num_classes=self.dataset_properties.K)
-    self.resnet.conv1 = torch.nn.Conv2d(
-        3, 64, kernel_size=3, stride=1, padding=1, bias=False
-    )
-    self.resnet.maxpool = nn.Identity()
+class BasicBlock(nn.Module):
+  def __init__(self, inplanes: int, planes: int, stack_idx: int, block_idx: int):
+    super(BasicBlock, self).__init__()
 
-  def forward(self, x) -> torch.Tensor:
-    return self.resnet(x)
+    self.is_downsample_layer = (stack_idx > 1 and block_idx == 1)
+    stride = 2 if self.is_downsample_layer else 1
+    
+    self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+    self.bn1 = nn.BatchNorm2d(planes)
+    self.relu = nn.ReLU(inplace=True)
+
+    self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+    self.bn2 = nn.BatchNorm2d(planes)
+
+    self.downsample = nn.Sequential(
+      nn.Conv2d(inplanes, planes, kernel_size=1, stride=stride, bias=False),
+      nn.BatchNorm2d(planes),
+    ) if self.is_downsample_layer else None
+
+  def forward(self, x):
+    identity = x
+
+    out = self.conv1(x)
+    out = self.bn1(out)
+    out = self.relu(out)
+
+    out = self.conv2(out)
+    out = self.bn2(out)
+
+    if self.downsample is not None:
+      identity = self.downsample(x)
+
+    out += identity
+    out = self.relu(out)
+
+    return out
+
+# https://gist.github.com/nitarshan/0dd8f076b37e6048575aadcefc155ae6
+class ResNet(ExperimentBaseModel):
+  def __init__(self, dataset_type: DatasetType, depth: int, width: int, stack_planes: List[int]):
+    super(ResNet, self).__init__(dataset_type)
+    
+    prev_filters = stack_planes[0]
+    inplanes = self.dataset_properties.D[0]
+
+    self.conv1 = nn.Conv2d(inplanes, prev_filters * width, kernel_size=3, stride=1, padding=1, bias=False)
+    self.bn1 = nn.BatchNorm2d(prev_filters * width)
+    self.relu = nn.ReLU(inplace=True)
+
+    stacks = []
+    for stack_idx, filters in enumerate(stack_planes):
+      stacks.append(self._make_stack(prev_filters * width, filters * width, depth, stack_idx + 1))
+      prev_filters = filters
+    self.stacks = nn.Sequential(*stacks)
+
+    self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+    self.fc = nn.Linear(stack_planes[-1] * width, self.dataset_properties.K)
+
+    for m in self.modules():
+      if isinstance(m, nn.Conv2d):
+        nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+      elif isinstance(m, nn.BatchNorm2d):
+        nn.init.constant_(m.weight, 1)
+        nn.init.constant_(m.bias, 0)
+
+  def _make_stack(self, inplanes, planes, depth, stack_idx: int):
+    layers = []
+    layers.append(BasicBlock(inplanes, planes, stack_idx, 1))
+    for block_idx in range(2, depth+1):
+      layers.append(BasicBlock(planes, planes, stack_idx, block_idx))
+    return nn.Sequential(*layers)
+
+  def forward(self, x):
+    x = self.conv1(x)
+    x = self.bn1(x)
+    x = self.relu(x)
+
+    x = self.stacks(x)
+
+    x = self.avgpool(x)
+    x = torch.flatten(x, 1)
+    x = self.fc(x)
+
+    return x
