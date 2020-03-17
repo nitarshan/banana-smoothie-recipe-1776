@@ -51,7 +51,7 @@ def _perturbed_model(
 # https://drive.google.com/file/d/1_6oUG94d0C3x7x2Vd935a2QqY-OaAWAM/view
 def _pacbayes_sigma(
   model: ExperimentBaseModel,
-  dataloader: DataLoader[Tuple[torch.Tensor, torch.Tensor]],
+  dataloader: DataLoader,
   accuracy: float,
   magnitude_eps: Optional[float],
   search_depth: int = 10,
@@ -88,7 +88,7 @@ def _pacbayes_sigma(
 
 def _margin(
   model: ExperimentBaseModel,
-  dataloader: DataLoader[Tuple[torch.Tensor, torch.Tensor]]
+  dataloader: DataLoader
 ) -> torch.Tensor:
   margins = []
   m = len(dataloader.dataset)
@@ -175,7 +175,7 @@ def get_single_measure(
   model: ExperimentBaseModel,
   init_model: ExperimentBaseModel,
   measure_type: CT,
-  dataloader: Optional[DataLoader[Tuple[torch.Tensor, torch.Tensor]]] = None,
+  dataloader: Optional[DataLoader] = None,
   acc: Optional[float] = None
 ) -> torch.Tensor:
   device = next(model.parameters()).device
@@ -268,7 +268,7 @@ def get_single_measure(
 def get_all_measures(
   model: ExperimentBaseModel,
   init_model: ExperimentBaseModel,
-  dataloader: Optional[DataLoader[Tuple[torch.Tensor, torch.Tensor]]] = None,
+  dataloader: Optional[DataLoader] = None,
   acc: Optional[float] = None
 ) -> Dict[CT, float]:
   measures = {}
