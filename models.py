@@ -24,10 +24,10 @@ def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
   elif e_config.model_type == ModelType.CONV:
     return ConvNet(e_config.dataset_type)
   elif e_config.model_type == ModelType.RESNET:
-    depth = e_config.model_shape[0]
-    width = e_config.model_shape[1]
+    depth = len(e_config.model_shape)
+    width = e_config.model_shape[0]
     stack_planes = e_config.model_shape[2:]
-    return ResNet(e_config.dataset_type, depth, width, stack_planes)
+    return ResNet(e_config.dataset_type, depth, width, [16,32,64])
   raise KeyError
 
 class DeepNet(ExperimentBaseModel):

@@ -4,6 +4,7 @@ source /network/home/$USER/.bashrc
 module purge
 module load anaconda/3
 source $CONDA_ACTIVATE
+conda activate base
 conda activate ccm
 
 # 2. Prepare directories and copy dataset onto the compute node
@@ -22,7 +23,7 @@ dataset='MNIST'
 optimizer='SGD_MOMENTUM'
 measures='L2 PROD_OF_FRO SUM_OF_FRO PARAM_NORM PATH_NORM'
 targets=(19.73 8096.64 26.50 381.56 45.56) # See complexity_lambda_analysis.ipynb
-lrs='0.005'
+lrs='0.05'
 global_idx=0
 jobs_per_gpu=4
 
@@ -30,15 +31,15 @@ for lr in $lrs; do
 let "global_idx++"
 python run_experiment.py single \
 --root_dir=$SLURM_TMPDIR \
---model_type='DEEP' \
---model_width=30 \
+--model_type='RESNET' \
 --model_depth=2 \
---dataset_type='MNIST' \
---optimizer_type='ADAM' \
+--model_width=1 \
+--dataset_type='CIFAR10' \
+--optimizer_type='SGD_MOMENTUM' \
 --lr=$lr \
---epochs=1000 \
---batch_size=100 \
---complexity_type='L2' \
+--epochs=500 \
+--batch_size=128 \
+--complexity_type='NONE' \
 --complexity_lambda=None \
 --lagrangian_type='NONE' \
 --lagrangian_target=3 \
@@ -48,14 +49,14 @@ python run_experiment.py single \
 --lagrangian_patience_batches=200 \
 --lagrangian_improvement_rate=0.75 \
 --lagrangian_start_lambda=0 \
---global_convergence_method='min' \
+--global_convergence_method='leq' \
 --lagrangian_convergence_tolerance=1e-4 \
 --global_convergence_tolerance=1e-8 \
 --global_convergence_patience=30 \
---global_convergence_target=0.1 \
+--global_convergence_target=0.01 \
 --comet_api_key=$COMET_API_KEY \
 --comet_tag='lr_test_7' \
---log_epoch_freq=20 \
+--log_epoch_freq=10 \
 --use_cuda
 if (( $global_idx % $jobs_per_gpu == 0 )); then
     wait

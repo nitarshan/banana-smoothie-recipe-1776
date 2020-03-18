@@ -12,7 +12,7 @@ from models import ExperimentBaseModel
 
 
 def get_weights_only(model: ExperimentBaseModel) -> List[torch.nn.Parameter]:
-  return [p for name, p in model.named_parameters() if 'bias' not in name and '.bn' not in name]
+  return [p for name, p in model.named_parameters() if '.bias' not in name and '.bn' not in name and 'bn1' not in name and 'downsample.1' not in name]
 
 def get_flat_params(weights_only: Union[List[torch.nn.Parameter], List[torch.Tensor]]) -> torch.Tensor:
   return torch.cat([p.view(-1) for p in weights_only], dim=0)

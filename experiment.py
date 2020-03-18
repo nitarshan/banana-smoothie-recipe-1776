@@ -1,23 +1,24 @@
 from copy import deepcopy
-from measures import get_single_measure, get_all_measures
 from typing import Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import MultiStepLR
+from tqdm import trange
 
 from convergence_detection import ConvergeOnPlateau
 from dataset_helpers import get_dataloaders
 from experiment_config import (
-  ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, LagrangianType, ModelType,
-  OptimizerType)
+  DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, LagrangianType,
+  ModelType, OptimizerType)
 from logs import BaseLogger, DefaultLogger, Printer
+from measures import get_all_measures, get_single_measure
 from models import get_model_for_config
-from torch.optim.lr_scheduler import MultiStepLR
 
 
 class InfeasibleException(Exception):
-    pass
+  pass
 
 
 class NanLossException(Exception):
@@ -25,8 +26,14 @@ class NanLossException(Exception):
 
 
 class Experiment:
-  def __init__(self, e_state: ETrainingState, device: torch.device, e_config: Optional[EConfig]=None,
-               logger: Optional[BaseLogger]=None, result_save_callback: Optional[object]=None):
+  def __init__(
+    self,
+    e_state: ETrainingState,
+    device: torch.device,
+    e_config: Optional[EConfig] = None,
+    logger: Optional[BaseLogger] = None,
+    result_save_callback: Optional[object] = None
+  ):
     self.e_state = e_state
     self.device = device
     resume_from_checkpoint = (e_config is None) or e_config.resume_from_checkpoint
@@ -68,8 +75,6 @@ class Experiment:
       verbose=False
     )
 
-    self.risk_objective = F.cross_entropy
-
     # Load data
     self.train_loader, self.train_eval_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device, self.cfg.data_seed)
 
@@ -84,64 +89,17 @@ class Experiment:
     if self.cfg.optimizer_type == OptimizerType.SGD:
       return torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr)
     elif self.cfg.optimizer_type == OptimizerType.SGD_MOMENTUM:
-      return torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
+      return torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9, weight_decay=5e-4)
     elif self.cfg.optimizer_type == OptimizerType.ADAM:
       return torch.optim.Adam(self.model.parameters(), lr=self.cfg.lr)
     else:
       raise KeyError
   
-  def _reset_scheduler(self) -> torch.optim.lr_scheduler._LRScheduler:
+  def _reset_scheduler(self) -> Optional[MultiStepLR]:
     if self.cfg.model_type == ModelType.RESNET:
       # https://gist.github.com/y0ast/d91d09565462125a1eb75acc65da1469
       return MultiStepLR(self.optimizer, milestones=[25, 40], gamma=0.1)
-    return MultiStepLR(self.optimizer, milestones=[60000], gamma=0.2) 
-
-  def _make_train_loss(self, cross_entropy: torch.Tensor, complexity: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, bool]:
-    """
-    Assembles a training loss function based on the optimization method of the experiment
-
-    Parameters:
-    -----------
-    cross_entropy: torch.Tensor, dtype=float
-      The cross-entropy of the model
-    complexity: torch.Tensor, dtype=float
-      The complexity of the model
-
-    Returns:
-    --------
-    loss: torch.Tensor, dtype=float
-      The value of the assembled loss function
-    constraint: torch.Tensor, dtype=float
-      The value of the constraint (constant for unconstrained opt)
-    is_constraint: bool
-      Whether or not the loss includes a constraint
-
-    """
-    loss = cross_entropy.clone()
-    constraint = torch.zeros(1, device=cross_entropy.device)
-    is_constrained = False
-
-    # Unconstrained optimization (optionally with complexity as regularizer)
-    if self.cfg.lagrangian_type == LagrangianType.NONE:
-      if self.cfg.complexity_lambda is not None and self.cfg.complexity_lambda > 0:
-        loss += self.cfg.complexity_lambda * complexity
-
-    # Constrained optimization
-    elif self.e_state.epoch >= self.cfg.lagrangian_start_epoch:
-      constraint = torch.abs(complexity - self.cfg.lagrangian_target)
-      is_constrained = True
-
-      # Penalty method
-      if self.cfg.lagrangian_type == LagrangianType.PENALTY:
-        loss += (self.e_state.lagrangian_mu / 2) * constraint ** 2
-      # Augmented Lagrangian Method
-      elif self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
-        loss += (self.e_state.lagrangian_mu / 2) * constraint ** 2 + self.e_state.lagrangian_lambda * constraint
-      # Other
-      else:
-        raise ValueError("Unknown optimization method specified.")
-
-    return loss, constraint, is_constrained
+    return None
 
   def _train_epoch(self) -> None:
     self.model.train()
@@ -154,7 +112,7 @@ class Experiment:
       
       logits = self.model(data)
       complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type)
-      cross_entropy = self.risk_objective(logits, target)
+      cross_entropy = F.cross_entropy(logits, target)
 
       # Assemble the loss function based on the optimization method
       loss, constraint, is_constrained = self._make_train_loss(cross_entropy, complexity)
@@ -180,6 +138,33 @@ class Experiment:
 
       if self.e_state.converged:
         break
+
+  def _make_train_loss(self, cross_entropy: torch.Tensor, complexity: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, bool]:
+    loss = cross_entropy.clone()
+    constraint = torch.zeros(1, device=cross_entropy.device)
+    is_constrained = False
+
+    # Unconstrained optimization (optionally with complexity as regularizer)
+    if self.cfg.lagrangian_type == LagrangianType.NONE:
+      if self.cfg.complexity_lambda is not None and self.cfg.complexity_lambda > 0:
+        loss += self.cfg.complexity_lambda * complexity
+
+    # Constrained optimization
+    elif self.e_state.epoch >= self.cfg.lagrangian_start_epoch:
+      constraint = torch.abs(complexity - self.cfg.lagrangian_target)
+      is_constrained = True
+
+      # Penalty method
+      if self.cfg.lagrangian_type == LagrangianType.PENALTY:
+        loss += (self.e_state.lagrangian_mu / 2) * constraint ** 2
+      # Augmented Lagrangian Method
+      elif self.cfg.lagrangian_type == LagrangianType.AUGMENTED:
+        loss += (self.e_state.lagrangian_mu / 2) * constraint ** 2 + self.e_state.lagrangian_lambda * constraint
+      # Other
+      else:
+        raise ValueError("Unknown optimization method specified.")
+
+    return loss, constraint, is_constrained
 
   def _check_convergence(self, tolerance: float, convergence_patience: int) -> bool:
     loss = np.mean(self.e_state.loss_hist)
@@ -242,18 +227,18 @@ class Experiment:
 
   def train(self) -> Tuple[EvaluationMetrics, EvaluationMetrics]:
     self.printer.train_start(self.device)
-    train_eval ,val_eval = None, None
+    train_eval, val_eval = None, None
     
     self.e_state.global_batch = 0
-    for epoch in range(self.e_state.epoch, self.cfg.epochs + 1):
+    for epoch in trange(self.e_state.epoch, self.cfg.epochs + 1):
       self.e_state.epoch = epoch
       self._train_epoch()
-      self.scheduler.step(epoch)
+      if self.scheduler is not None:
+        self.scheduler.step() # DO NOT pass in epoch param, LR Scheduler is buggy
 
       if epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0 or self.e_state.converged:
         val_eval = self.evaluate(DatasetSubsetType.VAL)
         train_eval = self.evaluate(DatasetSubsetType.TRAIN)
-        #print(train_eval.all_complexities)
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
         self.printer.epoch_metrics(self.cfg, self.e_state, self.e_state.epoch, train_eval, val_eval)
         self.result_save_callback(epoch, val_eval, train_eval)
@@ -288,7 +273,7 @@ class Experiment:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       logits = self.model(data)
       complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type)
-      cross_entropy = self.risk_objective(logits, target, reduction='sum')
+      cross_entropy = F.cross_entropy(logits, target, reduction='sum')
       cross_entropy_loss += cross_entropy.item()  # sum up batch loss
       total_loss, _, _ = self._make_train_loss(cross_entropy, complexity)
       constraint_loss = (total_loss - cross_entropy).item()
@@ -301,7 +286,9 @@ class Experiment:
     cross_entropy_loss /= num_to_evaluate_on
     acc = num_correct.item() / num_to_evaluate_on
 
-    all_complexities = get_all_measures(self.model, self.init_model, data_loader, acc)
+    all_complexities = {}
+    if dataset_subset_type == DatasetSubsetType.TRAIN:
+      all_complexities = get_all_measures(self.model, self.init_model, data_loader, acc)
 
     self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
 
