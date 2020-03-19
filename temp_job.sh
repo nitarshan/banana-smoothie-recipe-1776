@@ -39,10 +39,10 @@ python run_experiment.py single \
 --lr=$lr \
 --epochs=500 \
 --batch_size=128 \
---complexity_type='NONE' \
+--complexity_type='L2' \
 --complexity_lambda=None \
---lagrangian_type='NONE' \
---lagrangian_target=3 \
+--lagrangian_type='PENALTY' \
+--lagrangian_target=20 \
 --lagrangian_start_epoch=0 \
 --lagrangian_start_mu=1e-6 \
 --lagrangian_tolerance=0.01 \
