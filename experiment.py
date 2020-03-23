@@ -89,7 +89,7 @@ class Experiment:
     if self.cfg.optimizer_type == OptimizerType.SGD:
       return torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr)
     elif self.cfg.optimizer_type == OptimizerType.SGD_MOMENTUM:
-      return torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9, weight_decay=5e-4)
+      return torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
     elif self.cfg.optimizer_type == OptimizerType.ADAM:
       return torch.optim.Adam(self.model.parameters(), lr=self.cfg.lr)
     else:
@@ -97,8 +97,9 @@ class Experiment:
   
   def _reset_scheduler(self) -> Optional[MultiStepLR]:
     if self.cfg.model_type == ModelType.RESNET:
+      return None
       # https://gist.github.com/y0ast/d91d09565462125a1eb75acc65da1469
-      return MultiStepLR(self.optimizer, milestones=[25, 40], gamma=0.1)
+      #return MultiStepLR(self.optimizer, milestones=[25, 40], gamma=0.1)
     return None
 
   def _train_epoch(self) -> None:
