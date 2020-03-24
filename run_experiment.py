@@ -5,7 +5,7 @@ import time
 from typing import Optional, Tuple, List
 from collections import deque
 
-from logs import CometLogger
+from logs import CometLogger, WandbLogger
 import fire
 import torch
 
@@ -65,6 +65,7 @@ def single(
   seed: Optional[int] = None,
   data_seed: Optional[int] = None,
   data_dir: Optional[str] = None,
+  use_wandb: bool = False,
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
@@ -128,8 +129,11 @@ def single(
 
   print('[Experiment {}]'.format(experiment_id), e_config)
   device = torch.device('cuda' if use_cuda else 'cpu')
-  if logger is None and comet_api_key is not None:
-    logger = CometLogger(comet_api_key, comet_tag, e_config.to_tensorboard_dict())
+  if logger is None:
+    if use_wandb:
+      logger = WandbLogger(comet_api_key, comet_tag, e_config.to_tensorboard_dict())
+    elif comet_api_key is not None:
+      logger = CometLogger(comet_api_key, comet_tag, e_config.to_tensorboard_dict())
   val_eval, train_eval = Experiment(e_state, device, e_config, logger, dump_results).train()
 
 if __name__ == '__main__':

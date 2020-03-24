@@ -1,12 +1,15 @@
 import time
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from comet_ml import Experiment as CometExperiment
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
+import wandb
 
-from experiment_config import ComplexityType, EConfig, ETrainingState, LagrangianType, Verbosity, DatasetSubsetType, EvaluationMetrics
+from experiment_config import (
+  ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics,
+  LagrangianType, Verbosity)
 
 
 class BaseLogger(object):
@@ -42,7 +45,7 @@ class BaseLogger(object):
   
   def log_generalization_gap(self, state: ETrainingState, train_acc: float, val_acc: float, train_loss: float, val_loss: float, complexity: float, all_complexities: Dict[ComplexityType, float]) -> None:
     self.log_metrics(
-      state.epoch,
+      state.global_batch,
       {
         'generalization/error': train_acc - val_acc,
         'generalization/loss': train_loss - val_loss,
@@ -52,7 +55,7 @@ class BaseLogger(object):
   
   def log_epoch_end(self, cfg: EConfig, state: ETrainingState, datasubset: DatasetSubsetType, avg_loss: float, acc: float) -> None:
     self.log_metrics(
-      state.epoch,
+      state.global_batch,
       {
         'cross_entropy/{}'.format(datasubset.name.lower()): avg_loss,
         'accuracy/{}'.format(datasubset.name.lower()): acc,
@@ -107,6 +110,20 @@ class CometLogger(BaseLogger):
 
   def __del__(self):
     self.writer.end()
+
+
+class WandbLogger(BaseLogger):
+  def __init__(self, tag: Optional[str] = None, hps: Optional[dict] = None):
+    wandb.init(project='ccm', config=hps, tags=[tag])
+
+  def log_metrics(self, step: int, metrics: dict):
+    wandb.log(metrics, step=step)
+
+  def log_hparams(self, hps: dict, metrics: dict):
+    pass
+
+  def __del__(self):
+    pass
 
 
 class Printer(object):
