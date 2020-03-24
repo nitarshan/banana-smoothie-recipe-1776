@@ -57,7 +57,8 @@ python run_experiment.py single \
 --comet_api_key=$COMET_API_KEY \
 --comet_tag='lr_test_7' \
 --log_epoch_freq=10 \
---use_cuda
+--use_cuda \
+--use_wandb
 if (( $global_idx % $jobs_per_gpu == 0 )); then
     wait
 fi
