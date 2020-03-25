@@ -154,6 +154,7 @@ class EConfig:
   checkpoint_dir: Path = Path('checkpoints')
   resume_from_checkpoint: bool = False
   verbosity: Verbosity = Verbosity.NONE
+  use_tqdm: bool = False
 
   # Validation
   def __post_init__(self):

@@ -231,15 +231,15 @@ class Experiment:
     train_eval, val_eval = None, None
     
     self.e_state.global_batch = 0
-    for epoch in trange(self.e_state.epoch, self.cfg.epochs + 1):
+    for epoch in trange(self.e_state.epoch, self.cfg.epochs + 1, disable=(not self.cfg.use_tqdm)):
       self.e_state.epoch = epoch
       self._train_epoch()
       if self.scheduler is not None:
         self.scheduler.step() # DO NOT pass in epoch param, LR Scheduler is buggy
 
       if epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0 or self.e_state.converged:
+        train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.cfg.epochs or self.e_state.converged))
         val_eval = self.evaluate(DatasetSubsetType.VAL)
-        train_eval = self.evaluate(DatasetSubsetType.TRAIN)
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
         self.printer.epoch_metrics(self.cfg, self.e_state, self.e_state.epoch, train_eval, val_eval)
         self.result_save_callback(epoch, val_eval, train_eval)
@@ -260,7 +260,7 @@ class Experiment:
     return val_eval, train_eval
 
   @torch.no_grad()
-  def evaluate(self, dataset_subset_type: DatasetSubsetType) -> EvaluationMetrics:
+  def evaluate(self, dataset_subset_type: DatasetSubsetType, compute_all_measures: bool = False) -> EvaluationMetrics:
     self.model.eval()
     cross_entropy_loss = 0
     constraint_loss = 0
@@ -288,7 +288,7 @@ class Experiment:
     acc = num_correct.item() / num_to_evaluate_on
 
     all_complexities = {}
-    if dataset_subset_type == DatasetSubsetType.TRAIN:
+    if dataset_subset_type == DatasetSubsetType.TRAIN and compute_all_measures:
       all_complexities = get_all_measures(self.model, self.init_model, data_loader, acc)
 
     self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)

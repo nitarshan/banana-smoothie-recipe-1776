@@ -66,6 +66,7 @@ def single(
   data_seed: Optional[int] = None,
   data_dir: Optional[str] = None,
   use_wandb: bool = False,
+  use_tqdm: bool = False,
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
@@ -106,7 +107,8 @@ def single(
     log_dir=log_path,
     data_dir=data_path,
     checkpoint_dir=checkpoint_path,
-    verbosity=Verbosity.LAGRANGIAN
+    verbosity=Verbosity.LAGRANGIAN,
+    use_tqdm=use_tqdm,
   )
   e_state = ETrainingState(
     id=experiment_id,
