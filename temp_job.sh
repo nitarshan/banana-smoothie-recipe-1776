@@ -1,6 +1,6 @@
 # 1. Load your environment
 echo 'Load Environment'
-source /network/home/$USER/.bashrc
+source ~/.bashrc
 module purge
 module load anaconda/3
 source $CONDA_ACTIVATE
@@ -8,60 +8,66 @@ conda activate base
 conda activate ccm
 
 # 2. Prepare directories and copy dataset onto the compute node
-echo 'Loading Datasets'
+echo "Loading Datasets"
 mkdir -p /network/tmp1/$USER/results
 mkdir -p $SLURM_TMPDIR/data/MNIST/
-mkdir $SLURM_TMPDIR/results
+mkdir -p $SLURM_TMPDIR/results/
 cp -r /network/data1/mnist/processed $SLURM_TMPDIR/data/MNIST/
 cp -r /network/data1/cifar/cifar-10-batches-py $SLURM_TMPDIR/data/
 # cp -r /network/data1/svhn $SLURM_TMPDIR/data/
 
 # 3. Launch your job
-echo 'Launching Experiment'
-model='DEEP'
-dataset='MNIST'
-optimizer='SGD_MOMENTUM'
-measures='L2 PROD_OF_FRO SUM_OF_FRO PARAM_NORM PATH_NORM'
-targets=(19.73 8096.64 26.50 381.56 45.56) # See complexity_lambda_analysis.ipynb
-lrs='0.05'
+echo "Launching Experiment"
+model=DEEP
+dataset=MNIST
+optims="SGD_MOMENTUM ADAM"
+measures=(L2 PROD_OF_FRO SUM_OF_FRO PARAM_NORM PATH_NORM)
+lrs="0.001 0.005 0.01 0.05 0.1"
+widths="30 60 100"
+depths="1 2 3"
 global_idx=0
-jobs_per_gpu=4
+jobs_per_gpu=3
 
+for optim in $optims; do
 for lr in $lrs; do
+for width in $widths; do
+for depth in $depths; do
 let "global_idx++"
 python run_experiment.py single \
 --root_dir=$SLURM_TMPDIR \
---model_type='RESNET' \
---model_depth=2 \
---model_width=1 \
---dataset_type='CIFAR10' \
---optimizer_type='SGD_MOMENTUM' \
+--model_type=DEEP \
+--model_depth=$depth \
+--model_width=$width \
+--dataset_type=MNIST \
+--optimizer_type=$optim \
 --lr=$lr \
---epochs=500 \
+--epochs=150 \
 --batch_size=128 \
---complexity_type='L2' \
+--complexity_type=NONE \
 --complexity_lambda=None \
---lagrangian_type='PENALTY' \
---lagrangian_target=20 \
+--lagrangian_type=NONE \
+--lagrangian_target=10 \
 --lagrangian_start_epoch=0 \
 --lagrangian_start_mu=1e-6 \
 --lagrangian_tolerance=0.01 \
 --lagrangian_patience_batches=200 \
 --lagrangian_improvement_rate=0.75 \
 --lagrangian_start_lambda=0 \
---global_convergence_method='leq' \
+--global_convergence_method=leq \
 --lagrangian_convergence_tolerance=1e-4 \
 --global_convergence_tolerance=1e-8 \
 --global_convergence_patience=30 \
---global_convergence_target=0.01 \
+--global_convergence_target=0.1 \
 --comet_api_key=$COMET_API_KEY \
---comet_tag='lr_test_7' \
 --log_epoch_freq=10 \
+--comet_tag=tedros4 \
 --use_cuda \
---use_wandb \
---use_tqdm
+--use_wandb &
 if (( $global_idx % $jobs_per_gpu == 0 )); then
     wait
 fi
+done
+done
+done
 done
 wait
