@@ -124,13 +124,13 @@ def _l2_dist(weights_only: List[torch.nn.Parameter], init_weights_only: List[tor
   return get_flat_params([(p - q) for p, q in zip(weights_only, init_weights_only)]).norm(p=2)
 
 def _prod_of_fro(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
-  return get_parameter_norms(weights_only, 'fro').log().sum().exp()
+  return get_parameter_norms(weights_only, 'fro').flatten().logsumexp(0)
 
 def _param_norm(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
   return get_parameter_norms(weights_only, 'fro').sum()
 
 def _spec_norm(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
-  return get_parameter_norms(weights_only, 'spec').log().sum().exp()
+  return get_parameter_norms(weights_only, 'spec').flatten().logsumexp(0)
 
 def _fro_dist(weights_only: List[torch.nn.Parameter], init_weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
   return get_parameter_norms([(p - q) for p, q in zip(weights_only, init_weights_only)], 'fro').sum()
