@@ -108,7 +108,7 @@ def _path_norm(model: ExperimentBaseModel) -> torch.Tensor:
   model.eval()
   for param in model.parameters():
     if param.requires_grad:
-      param.pow_(2)
+      param.data.pow_(2)
   x = torch.ones([1] + model.dataset_properties.D, device=device)
   x = model(x)
   del model
