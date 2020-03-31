@@ -10,6 +10,7 @@ import wandb
 from experiment_config import (
   ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics,
   LagrangianType, Verbosity)
+from lagrangian import Lagrangian
 
 
 class BaseLogger(object):
@@ -19,8 +20,16 @@ class BaseLogger(object):
   def log_hparams(self, hps: dict, metrics: dict):
     raise NotImplementedError()
 
-  def log_batch_end(self, cfg: EConfig, state: ETrainingState, cross_entropy: torch.Tensor, complexity: torch.Tensor,
-            loss: torch.Tensor, constraint: torch.Tensor) -> None:
+  def log_batch_end(
+    self,
+    cfg: EConfig,
+    state: ETrainingState,
+    lagrangian: Lagrangian,
+    cross_entropy: torch.Tensor,
+    complexity: torch.Tensor,
+    loss: torch.Tensor,
+    constraint: torch.Tensor
+  ) -> None:
     if cfg.log_batch_freq is not None and state.global_batch % cfg.log_batch_freq == 0:
       # Collect metrics for logging
       metrics = {
@@ -32,13 +41,13 @@ class BaseLogger(object):
       }
       if cfg.lagrangian_type != LagrangianType.NONE:
         metrics.update({
-          'constraint_mu/minibatch': state.lagrangian_mu,
+          'constraint_mu/minibatch': lagrangian.lagrangian_mu,
           'constraint/minibatch': constraint.item(),
           'loss_constraint_only/minibatch': (loss.item() - cross_entropy.item())
         })
         if cfg.lagrangian_type == LagrangianType.AUGMENTED:
           metrics.update({
-            'constraint_lambda/minibatch': state.lagrangian_lambda,
+            'constraint_lambda/minibatch': lagrangian.lagrangian_lambda,
           })
       # Send metrics to logger
       self.log_metrics(step=state.global_batch, metrics=metrics)
@@ -147,23 +156,18 @@ class Printer(object):
         state.id, state.epoch, state.batch * len(data), len(loader.dataset), 100. * state.batch / len(loader),
         loss.item()))
 
-  def lambda_increase(self, state: ETrainingState):
+  def lagrangian_update(self, state: ETrainingState, constraint_hist, lagrangian_mu, lagrangian_lambda):
     if self.verbosity >= Verbosity.LAGRANGIAN:
-      print('[{}][{}|{}][AL: {:.3f} AC: {:.3f}] Increasing Lagrangian lambda to {:.2g}'.format(
-        state.id, state.epoch, state.batch, np.mean(state.loss_hist), np.mean(state.constraint_hist), state.lagrangian_lambda))
+      print('[{}][{}|{}][AL: {:.3f} AC: {:.3f}] Lagrangian mu to {:.2g} and lambda to {:.2g}'.format(
+        state.id, state.epoch, state.batch, np.mean(state.loss_hist), np.mean(constraint_hist), lagrangian_mu, lagrangian_lambda))
 
-  def mu_increase(self, state: ETrainingState):
-    if self.verbosity >= Verbosity.LAGRANGIAN:
-      print('[{}][{}|{}][AL: {:.3f} AC: {:.3f}] Increasing Lagrangian mu to {:.2g}'.format(
-        state.id, state.epoch, state.batch, np.mean(state.loss_hist), np.mean(state.constraint_hist), state.lagrangian_mu))
-
-  def epoch_metrics(self, cfg: EConfig, state: ETrainingState, epoch: int, train_eval: EvaluationMetrics, val_eval: EvaluationMetrics) -> None:
+  def epoch_metrics(self, cfg: EConfig, state: ETrainingState, constraint_hist, epoch: int, train_eval: EvaluationMetrics, val_eval: EvaluationMetrics) -> None:
     if self.verbosity >= Verbosity.EPOCH:
       print(
         '[{}][{}][GL: {:.2g} GE: {:.2f}pp][AL: {:.3f} AC: {:.3f}][C: {:.2g} C: {:.2g} T: {:.2g}][{} L: {:.4g}, A: {:.2f}%][{} L: {:.4g}, A: {:.2f}%][CL: {:.4g}]'.format(
           self.experiment_id, epoch,
           train_eval.avg_loss - val_eval.avg_loss, 100. * (train_eval.acc - val_eval.acc),
-          np.mean(state.loss_hist), np.mean(state.constraint_hist),
+          np.mean(state.loss_hist), np.mean(constraint_hist),
           train_eval.complexity, train_eval.complexity - cfg.lagrangian_target, cfg.lagrangian_target * cfg.lagrangian_tolerance,
           DatasetSubsetType.VAL.name, val_eval.avg_loss, 100. * val_eval.acc,
           DatasetSubsetType.TRAIN.name, train_eval.avg_loss, 100. * train_eval.acc,

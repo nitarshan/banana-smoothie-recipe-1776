@@ -112,11 +112,7 @@ def single(
   )
   e_state = ETrainingState(
     id=experiment_id,
-    lagrangian_mu=e_config.lagrangian_start_mu,
-    lagrangian_lambda=e_config.lagrangian_start_lambda,
     loss_hist=deque([], lagrangian_patience_batches or 1),
-    constraint_hist=deque([], lagrangian_patience_batches or 1),
-    convergence_test_hist=deque([], global_convergence_patience or 1),
   )
 
   def dump_results(epoch, val_eval, train_eval):

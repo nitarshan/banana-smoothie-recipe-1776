@@ -100,16 +100,8 @@ class ETrainingState:
   epoch: int = 1
   batch: int = 1
   global_batch: int = 1
-  lagrangian_mu: Optional[float] = None
-  lagrangian_lambda: Optional[float] = None
-  prev_loss: Optional[float] = None
-  prev_acc: Optional[float] = None
-  prev_constraint: Optional[float] = None
   loss_hist: Deque[float] = deque([])
-  constraint_hist: Deque[float] = deque([])
-  constraint_to_beat = infty
   converged: bool = False
-  convergence_test_hist: Deque[bool] = deque([])
 
 # Configuration for the experiment
 @dataclass(frozen=True)
