@@ -102,7 +102,7 @@ def _margin(
   return torch.cat(margins).kthvalue(m // 10)[0]
 
 # https://github.com/bneyshabur/generalization-bounds/blob/master/measures.py
-def _path_norm(model: ExperimentBaseModel) -> torch.Tensor:
+def _path_norm_observ(model: ExperimentBaseModel) -> torch.Tensor:
   device = next(model.parameters()).device
   model = deepcopy(model)
   model.eval()
@@ -112,6 +112,13 @@ def _path_norm(model: ExperimentBaseModel) -> torch.Tensor:
   x = torch.ones([1] + model.dataset_properties.D, device=device)
   x = model(x)
   del model
+  return x.sum().sqrt()
+
+def _path_norm_interv(model: ExperimentBaseModel) -> torch.Tensor:
+  device = next(model.parameters()).device
+  model.eval()
+  x = torch.ones([1] + model.dataset_properties.D, device=device)
+  x = model(x)
   return x.sum().sqrt()
 
 def _param_count(model: ExperimentBaseModel) -> int:
@@ -175,6 +182,7 @@ def get_single_measure(
   model: ExperimentBaseModel,
   init_model: ExperimentBaseModel,
   measure_type: CT,
+  intervention_mode: Optional[bool] = False,
   dataloader: Optional[DataLoader] = None,
   acc: Optional[float] = None
 ) -> torch.Tensor:
@@ -195,8 +203,10 @@ def get_single_measure(
     return d * _prod_of_fro(weights_only) ** (1/d)
   elif measure_type == CT.PARAM_NORM:
     return _param_norm(weights_only)
-  elif measure_type == CT.PATH_NORM:
-    return _path_norm(model)
+  elif measure_type == CT.PATH_NORM and intervention_mode == False:
+    return _path_norm_observ(model)
+  elif measure_type == CT.PATH_NORM and intervention_mode == True:
+    return _path_norm_interv(model)
   elif measure_type == CT.PARAMS:
     return torch.tensor(sum(p.numel() for p in model.parameters() if p.requires_grad))
   elif measure_type == CT.PROD_OF_SPEC:
@@ -258,8 +268,10 @@ def get_single_measure(
       return _spec_norm(weights_only) / margin ** 2
     elif measure_type == CT.SUM_OF_SPEC_OVER_MARGIN:
       return d * (_spec_norm(weights_only) / margin ** 2) ** (1/d)
-    elif measure_type == CT.PATH_NORM_OVER_MARGIN:
-      return _path_norm(model) / margin ** 2
+    elif measure_type == CT.PATH_NORM_OVER_MARGIN and intervention_mode == False:
+      return _path_norm_observ(model) / margin ** 2
+    elif measure_type == CT.PATH_NORM_OVER_MARGIN and intervention_mode == True:
+      return _path_norm_interv(model) / margin ** 2
     else:
       raise KeyError
     
@@ -285,7 +297,7 @@ def get_all_measures(
   measures[CT.PROD_OF_FRO] = _prod_of_fro(weights_only)
   measures[CT.SUM_OF_FRO] = d * measures[CT.PROD_OF_FRO] ** (1/d)
   measures[CT.PARAM_NORM] = _param_norm(weights_only)
-  measures[CT.PATH_NORM] = _path_norm(model)
+  measures[CT.PATH_NORM] = _path_norm_observ(model)
   measures[CT.PARAMS] = torch.tensor(_param_count(model))
   measures[CT.PROD_OF_SPEC] = _spec_norm(weights_only)
   measures[CT.SUM_OF_SPEC] = d * measures[CT.PROD_OF_SPEC] ** (1/d)
@@ -319,7 +331,7 @@ def get_all_measures(
     measures[CT.SUM_OF_FRO_OVER_MARGIN] = d * (measures[CT.PROD_OF_FRO] / margin ** 2) ** (1/d)
     measures[CT.PROD_OF_SPEC_OVER_MARGIN] = measures[CT.PROD_OF_SPEC] / margin ** 2
     measures[CT.SUM_OF_SPEC_OVER_MARGIN] = d * (measures[CT.PROD_OF_SPEC] / margin ** 2) ** (1/d)
-    measures[CT.PATH_NORM_OVER_MARGIN] = _path_norm(model) / margin ** 2
+    measures[CT.PATH_NORM_OVER_MARGIN] = _path_norm_observ(model) / margin ** 2
 
   measures = {k: v.item() for k, v in measures.items()}
   return measures

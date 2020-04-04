@@ -120,16 +120,37 @@ class Experiment:
       self.e_state.global_batch = (self.e_state.epoch - 1) * len(self.train_loader) + self.e_state.batch
       self.optimizer.zero_grad()
       
+      if self.cfg.complexity_type.name == 'PATH_NORM' or self.cfg.complexity_type.name == 'PATH_NORM_OVER_MARGIN':
+        orig_model = deepcopy(self.model)
+
       logits = self.model(data)
-      complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type)
       cross_entropy = F.cross_entropy(logits, target)
 
+      cross_entropy.backward()
+      loss = cross_entropy.clone()
+
+      if self.cfg.complexity_type.name == 'PATH_NORM' or self.cfg.complexity_type.name == 'PATH_NORM_OVER_MARGIN':
+        for param in self.model.parameters():
+          if param.requires_grad:
+            param.data.pow_(2)
+
+      complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type, intervention_mode=True)
+
       # Assemble the loss function based on the optimization method
-      loss, constraint, is_constrained = self.lagrangian.make_loss(cross_entropy, complexity, self.e_state.epoch)
+      complexity_loss, constraint, is_constrained = self.lagrangian.make_loss(torch.zeros(()), complexity, self.e_state.epoch)
+
+      if self.cfg.complexity_type.name != 'NONE':
+        complexity_loss.backward()
+
+      loss += complexity_loss.clone()
+
       self.e_state.loss_hist.append(loss.item())
 
-      # Update network parameters
-      loss.backward()
+      if self.cfg.complexity_type.name == 'PATH_NORM' or self.cfg.complexity_type.name == 'PATH_NORM_OVER_MARGIN':
+        for param, orig_param in zip(self.model.parameters(), orig_model.parameters()):
+          if param.requires_grad:
+            param.data = orig_param.data
+
       self.optimizer.step()
 
       # Update lagrangian parameters
