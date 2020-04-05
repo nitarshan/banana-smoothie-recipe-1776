@@ -145,6 +145,8 @@ class Experiment:
       loss += complexity_loss.clone()
 
       self.e_state.loss_hist.append(loss.item())
+      
+      self.model.train()
 
       if self.cfg.complexity_type.name == 'PATH_NORM' or self.cfg.complexity_type.name == 'PATH_NORM_OVER_MARGIN':
         for param, orig_param in zip(self.model.parameters(), orig_model.parameters()):
