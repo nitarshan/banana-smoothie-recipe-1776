@@ -137,7 +137,7 @@ class Experiment:
       complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type, intervention_mode=True)
 
       # Assemble the loss function based on the optimization method
-      complexity_loss, constraint, is_constrained = self.lagrangian.make_loss(torch.zeros(()), complexity, self.e_state.epoch)
+      complexity_loss, constraint, is_constrained = self.lagrangian.make_loss(torch.zeros((), device=cross_entropy.device), complexity, self.e_state.epoch)
 
       if self.cfg.complexity_type.name != 'NONE':
         complexity_loss.backward()
