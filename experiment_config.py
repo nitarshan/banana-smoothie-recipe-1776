@@ -147,6 +147,7 @@ class EConfig:
   resume_from_checkpoint: bool = False
   verbosity: Verbosity = Verbosity.NONE
   use_tqdm: bool = False
+  use_dataset_cross_entropy_stopping: bool = False
 
   # Validation
   def __post_init__(self):

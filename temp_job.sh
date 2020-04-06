@@ -18,16 +18,23 @@ cp -r /network/data1/cifar/cifar-10-batches-py $SLURM_TMPDIR/data/
 
 # 3. Launch your job
 echo "Launching Experiment"
+tag="dataset_cross_entropy_stop_intervention"
 model=DEEP
 dataset=MNIST
-optims="SGD_MOMENTUM ADAM"
-measures=(L2 PROD_OF_FRO SUM_OF_FRO PARAM_NORM PATH_NORM)
-lrs="0.001 0.005 0.01 0.05 0.1"
+optims="SGD_MOMENTUM"
+lagrangian_types="PENALTY"
+measures="L2 L2_DIST SUM_OF_SPEC"
+targets="7 10 20 40"
+ce_target="0.05"
+lrs="0.001 0.01 0.1"
 widths="30 60 100"
 depths="1 2 3"
 global_idx=0
-jobs_per_gpu=3
+jobs_per_gpu=5
 
+for measure in $measures; do
+for lagrangian_type in $lagrangian_types; do
+for target in $targets; do
 for optim in $optims; do
 for lr in $lrs; do
 for width in $widths; do
@@ -43,13 +50,13 @@ python run_experiment.py single \
 --lr=$lr \
 --epochs=150 \
 --batch_size=128 \
---complexity_type=NONE \
+--complexity_type=$measure \
 --complexity_lambda=None \
---lagrangian_type=NONE \
---lagrangian_target=10 \
+--lagrangian_type=$lagrangian_type \
+--lagrangian_target=$target \
 --lagrangian_start_epoch=0 \
---lagrangian_start_mu=1e-6 \
---lagrangian_tolerance=0.01 \
+--lagrangian_start_mu=1e-2 \
+--lagrangian_tolerance=0.1 \
 --lagrangian_patience_batches=200 \
 --lagrangian_improvement_rate=0.75 \
 --lagrangian_start_lambda=0 \
@@ -57,15 +64,19 @@ python run_experiment.py single \
 --lagrangian_convergence_tolerance=1e-4 \
 --global_convergence_tolerance=1e-8 \
 --global_convergence_patience=30 \
---global_convergence_target=0.1 \
+--global_convergence_target=$ce_target \
 --comet_api_key=$COMET_API_KEY \
 --log_epoch_freq=10 \
---comet_tag=tedros4 \
+--comet_tag=$tag \
 --use_cuda \
---use_wandb &
+--use_wandb \
+--use_dataset_cross_entropy_stopping &
 if (( $global_idx % $jobs_per_gpu == 0 )); then
     wait
 fi
+done
+done
+done
 done
 done
 done
