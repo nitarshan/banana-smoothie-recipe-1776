@@ -139,7 +139,7 @@ class Experiment:
       # Assemble the loss function based on the optimization method
       complexity_loss, constraint, is_constrained = self.lagrangian.make_loss(torch.zeros((), device=cross_entropy.device), complexity, self.e_state.epoch)
 
-      if self.cfg.complexity_type.name != 'NONE':
+      if is_constrained and self.cfg.complexity_type.name != 'NONE':
         complexity_loss.backward()
 
       loss += complexity_loss.clone()
