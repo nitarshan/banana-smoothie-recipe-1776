@@ -28,7 +28,7 @@ cp -r /network/data1/mnist/processed $SLURM_TMPDIR/data/MNIST/
 model='DEEP DEEP_UNDER'
 dataset='MNIST'
 optimizer='ADAM' # 1
-measures='L2 SUM_OF_FRO PARAM_NORM PATH_NORM PROD_OF_FRO' # 5
+measures='L2 LOG_SUM_OF_FRO PARAM_NORM PATH_NORM LOG_PROD_OF_FRO' # 5
 targets='0.2 0.5 0.75 1 1.5 2 2.5 5 10 25 50 100 250 500 1000' # 10
 runs=3 # 1
 global_idx=0

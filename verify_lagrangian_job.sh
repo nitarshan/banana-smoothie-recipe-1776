@@ -29,7 +29,7 @@ cp -r /network/data1/cifar/cifar-10-batches-py $SLURM_TMPDIR/data/
 model='DEEP'
 dataset='MNIST'
 optimizer='SGD_MOMENTUM'
-measures='L2 PROD_OF_FRO SUM_OF_FRO PARAM_NORM PATH_NORM'
+measures='L2 LOG_PROD_OF_FRO LOG_SUM_OF_FRO PARAM_NORM PATH_NORM'
 targets=(19.73 8096.64 26.50 381.56 45.56) # See complexity_lambda_analysis.ipynb
 runs=3
 global_idx=0

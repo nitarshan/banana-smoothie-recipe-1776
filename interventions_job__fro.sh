@@ -1,11 +1,13 @@
 # 1. Load your environment
 echo 'Load Environment'
+: '
 source ~/.bashrc
 module purge
 module load anaconda/3
 source $CONDA_ACTIVATE
 conda activate base
 conda activate ccm
+'
 
 # 2. Prepare directories and copy dataset onto the compute node
 echo "Loading Datasets"
@@ -15,25 +17,45 @@ mkdir -p $SLURM_TMPDIR/results/
 cp -r /network/data1/mnist/processed $SLURM_TMPDIR/data/MNIST/
 cp -r /network/data1/cifar/cifar-10-batches-py $SLURM_TMPDIR/data/
 # cp -r /network/data1/svhn $SLURM_TMPDIR/data/
-
 # 3. Launch your job
 echo "Launching Experiment"
-tag="dataset_cross_entropy_stop_intervention_2"
+COMET_API_KEY="a21c3c978d64ab77bd9b9329f8640b46edaa9ec0"
+#tag="tedros25"
+#tag="interventional_path_norm_ethan"
+#tag="interventional_path_norm_ethan__more_epochs"
+#tag="interventional_path_norm_ethan__correct"
+#tag="interventional_path_norm_ethan__actually_correct"
+#tag="interventional_path_norm_ethan__weird"
+#tag="interventional_path_norm_ethan__more_correct"
+tag="interventional_path_norm_ethan__nan"
 model=DEEP
 dataset=MNIST
 optims="SGD_MOMENTUM"
-lagrangian_types="PENALTY"
-measures="L2 L2_DIST LOG_SUM_OF_SPEC"
-targets="7 10 20 40"
-ce_target="0.05"
-lrs="0.001 0.005 0.01 0.03"
-widths="30 60 100"
-depths="1 2 3"
-global_idx=0
-jobs_per_gpu=5
+#measures="PATH_NORM"
+#measures="PACBAYES_ORIG"
+#measures="PATH_NORM_OVER_MARGIN"
+#measures="LOG_SUM_OF_FRO_OVER_MARGIN"
+#measures="LOG_SUM_OF_FRO LOG_PROD_OF_FRO"
+measures="LOG_PROD_OF_FRO"
+#measures="LOG_SUM_OF_FRO"
+#measures="L2"
+#measures="PATH_NORM_OVER_MARGIN"
+#targets="15"
+targets="1"
+#targets="100"
+#targets="1000"
+#targets="10 30"
+#lrs="0.01"
+lrs="0.001"
+#lrs="0.0001"
 
+epochs="90"
+
+widths="100"
+depths="3"
+global_idx=0
+jobs_per_gpu=3
 for measure in $measures; do
-for lagrangian_type in $lagrangian_types; do
 for target in $targets; do
 for optim in $optims; do
 for lr in $lrs; do
@@ -48,14 +70,14 @@ python run_experiment.py single \
 --dataset_type=MNIST \
 --optimizer_type=$optim \
 --lr=$lr \
---epochs=150 \
+--epochs=$epochs \
 --batch_size=128 \
 --complexity_type=$measure \
 --complexity_lambda=None \
---lagrangian_type=$lagrangian_type \
+--lagrangian_type=AUGMENTED \
 --lagrangian_target=$target \
 --lagrangian_start_epoch=0 \
---lagrangian_start_mu=1e-2 \
+--lagrangian_start_mu=1e-1 \
 --lagrangian_tolerance=0.1 \
 --lagrangian_patience_batches=200 \
 --lagrangian_improvement_rate=0.75 \
@@ -64,18 +86,15 @@ python run_experiment.py single \
 --lagrangian_convergence_tolerance=1e-4 \
 --global_convergence_tolerance=1e-8 \
 --global_convergence_patience=30 \
---global_convergence_target=$ce_target \
---global_convergence_evaluation_freq_milestones=[0.09,0.07,0.06] \
+--global_convergence_target=0.01 \
 --comet_api_key=$COMET_API_KEY \
 --log_epoch_freq=10 \
 --comet_tag=$tag \
---use_cuda \
---use_wandb \
---use_dataset_cross_entropy_stopping &
+--use_cuda=False \
+--use_wandb=True
 if (( $global_idx % $jobs_per_gpu == 0 )); then
     wait
 fi
-done
 done
 done
 done

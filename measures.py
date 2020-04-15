@@ -130,14 +130,15 @@ def _l2_norm(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
 def _l2_dist(weights_only: List[torch.nn.Parameter], init_weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
   return get_flat_params([(p - q) for p, q in zip(weights_only, init_weights_only)]).norm(p=2)
 
-def _prod_of_fro(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
-  return get_parameter_norms(weights_only, 'fro').log().sum().exp()
+def _log_prod_of_fro(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
+  ret = get_parameter_norms(weights_only, 'fro').log().sum()
+  return ret
 
 def _param_norm(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
   return get_parameter_norms(weights_only, 'fro').sum()
 
-def _spec_norm(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
-  return get_parameter_norms(weights_only, 'spec').log().sum().exp()
+def _log_spec_norm(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
+  return get_parameter_norms(weights_only, 'spec').log().sum()
 
 def _fro_dist(weights_only: List[torch.nn.Parameter], init_weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
   return get_parameter_norms([(p - q) for p, q in zip(weights_only, init_weights_only)], 'fro').sum()
@@ -197,10 +198,10 @@ def get_single_measure(
     return _l2_norm(weights_only)
   elif measure_type == CT.L2_DIST:
     return _l2_dist(weights_only, init_weights_only)
-  elif measure_type == CT.PROD_OF_FRO:
-    return _prod_of_fro(weights_only)
-  elif measure_type == CT.SUM_OF_FRO:
-    return d * _prod_of_fro(weights_only) ** (1/d)
+  elif measure_type == CT.LOG_PROD_OF_FRO:
+    return _log_prod_of_fro(weights_only)
+  elif measure_type == CT.LOG_SUM_OF_FRO:
+    return d + (1/d) * _log_prod_of_fro(weights_only)
   elif measure_type == CT.PARAM_NORM:
     return _param_norm(weights_only)
   elif measure_type == CT.PATH_NORM and intervention_mode == False:
@@ -209,10 +210,10 @@ def get_single_measure(
     return _path_norm_interv(model)
   elif measure_type == CT.PARAMS:
     return torch.tensor(sum(p.numel() for p in model.parameters() if p.requires_grad))
-  elif measure_type == CT.PROD_OF_SPEC:
-    return _spec_norm(weights_only)
-  elif measure_type == CT.SUM_OF_SPEC:
-    return d * _spec_norm(weights_only) ** (1/d)
+  elif measure_type == CT.LOG_PROD_OF_SPEC:
+    return _log_spec_norm(weights_only)
+  elif measure_type == CT.LOG_SUM_OF_SPEC:
+    return d + (1/d) * _log_spec_norm(weights_only)
   elif measure_type == CT.FRO_DIST:
     return _fro_dist(weights_only, init_weights_only)
   elif measure_type == CT.FRO_OVER_SPEC:
@@ -260,14 +261,14 @@ def get_single_measure(
     margin = _margin(model, dataloader)
     if measure_type == CT.INVERSE_MARGIN:
       return torch.tensor(1).to(device) / margin ** 2
-    elif measure_type == CT.PROD_OF_FRO_OVER_MARGIN:
-      return _prod_of_fro(weights_only) / margin ** 2
-    elif measure_type == CT.SUM_OF_FRO_OVER_MARGIN:
-      return d * (_prod_of_fro(weights_only) / margin ** 2) ** (1/d)
-    elif measure_type == CT.PROD_OF_SPEC_OVER_MARGIN:
-      return _spec_norm(weights_only) / margin ** 2
-    elif measure_type == CT.SUM_OF_SPEC_OVER_MARGIN:
-      return d * (_spec_norm(weights_only) / margin ** 2) ** (1/d)
+    elif measure_type == CT.LOG_PROD_OF_FRO_OVER_MARGIN:
+      return _log_prod_of_fro(weights_only) -  2 * margin.log()
+    elif measure_type == CT.LOG_SUM_OF_FRO_OVER_MARGIN:
+      return d + (1/d) * (_log_prod_of_fro(weights_only) -  2 * margin.log())
+    elif measure_type == CT.LOG_PROD_OF_SPEC_OVER_MARGIN:
+      return _log_spec_norm(weights_only) -  2 * margin.log()
+    elif measure_type == CT.LOG_SUM_OF_SPEC_OVER_MARGIN:
+      return d + (1/d) * (_log_spec_norm(weights_only) -  2 * margin.log())
     elif measure_type == CT.PATH_NORM_OVER_MARGIN and intervention_mode == False:
       return _path_norm_observ(model) / margin ** 2
     elif measure_type == CT.PATH_NORM_OVER_MARGIN and intervention_mode == True:
@@ -294,13 +295,13 @@ def get_all_measures(
   measures[CT.NONE] = torch.zeros((1,), device=device)
   measures[CT.L2] = _l2_norm(weights_only)
   measures[CT.L2_DIST] = _l2_dist(weights_only, init_weights_only)
-  measures[CT.PROD_OF_FRO] = _prod_of_fro(weights_only)
-  measures[CT.SUM_OF_FRO] = d * measures[CT.PROD_OF_FRO] ** (1/d)
+  measures[CT.LOG_PROD_OF_FRO] = _log_prod_of_fro(weights_only)
+  measures[CT.LOG_SUM_OF_FRO] = d + (1/d) * measures[CT.LOG_PROD_OF_FRO]
   measures[CT.PARAM_NORM] = _param_norm(weights_only)
   measures[CT.PATH_NORM] = _path_norm_observ(model)
   measures[CT.PARAMS] = torch.tensor(_param_count(model))
-  measures[CT.PROD_OF_SPEC] = _spec_norm(weights_only)
-  measures[CT.SUM_OF_SPEC] = d * measures[CT.PROD_OF_SPEC] ** (1/d)
+  measures[CT.LOG_PROD_OF_SPEC] = _log_spec_norm(weights_only)
+  measures[CT.LOG_SUM_OF_SPEC] = d + (1/d) * measures[CT.LOG_PROD_OF_SPEC]
   measures[CT.FRO_DIST] = _fro_dist(weights_only, init_weights_only)
   measures[CT.FRO_OVER_SPEC] = _fro_over_spec(weights_only, init_weights_only)
   measures[CT.DIST_SPEC_INIT] = _spec_dist(weights_only, init_weights_only)
@@ -327,10 +328,10 @@ def get_all_measures(
     # Margin measures
     margin = _margin(model, dataloader)
     measures[CT.INVERSE_MARGIN] = torch.tensor(1).to(device) / margin ** 2
-    measures[CT.PROD_OF_FRO_OVER_MARGIN] = measures[CT.PROD_OF_FRO] / margin ** 2
-    measures[CT.SUM_OF_FRO_OVER_MARGIN] = d * (measures[CT.PROD_OF_FRO] / margin ** 2) ** (1/d)
-    measures[CT.PROD_OF_SPEC_OVER_MARGIN] = measures[CT.PROD_OF_SPEC] / margin ** 2
-    measures[CT.SUM_OF_SPEC_OVER_MARGIN] = d * (measures[CT.PROD_OF_SPEC] / margin ** 2) ** (1/d)
+    measures[CT.LOG_PROD_OF_FRO_OVER_MARGIN] = measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log()
+    measures[CT.LOG_SUM_OF_FRO_OVER_MARGIN] = d + (1/d) * (measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log())
+    measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN] = measures[CT.LOG_PROD_OF_SPEC] - 2 * margin.log()
+    measures[CT.LOG_SUM_OF_SPEC_OVER_MARGIN] = d + (1/d) * (measures[CT.LOG_PROD_OF_SPEC] -  2 * margin.log())
     measures[CT.PATH_NORM_OVER_MARGIN] = _path_norm_observ(model) / margin ** 2
 
   measures = {k: v.item() for k, v in measures.items()}
