@@ -4,14 +4,12 @@ from typing import Optional, Tuple
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.optim.lr_scheduler import MultiStepLR
 from tqdm import trange
 
 from convergence_detection import ConvergeOnPlateau
 from dataset_helpers import get_dataloaders
 from experiment_config import (
-  DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, LagrangianType,
-  ModelType, OptimizerType)
+  ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, OptimizerType)
 from lagrangian import Lagrangian
 from logs import BaseLogger, DefaultLogger, Printer
 from measures import get_all_measures, get_single_measure
@@ -59,7 +57,6 @@ class Experiment:
 
     # Optimizer
     self.optimizer = self._reset_optimizer()
-    self.scheduler = self._reset_scheduler()
     self.detector = ConvergeOnPlateau(
       mode=e_config.global_convergence_method,
       patience=e_config.global_convergence_patience,
@@ -104,15 +101,11 @@ class Experiment:
     else:
       raise KeyError
   
-  def _reset_scheduler(self) -> Optional[MultiStepLR]:
-    if self.cfg.model_type == ModelType.RESNET:
-      return None
-      # https://gist.github.com/y0ast/d91d09565462125a1eb75acc65da1469
-      #return MultiStepLR(self.optimizer, milestones=[25, 40], gamma=0.1)
-    return None
-
   def _train_epoch(self) -> None:
     self.model.train()
+    ce_check_batches = [(len(self.train_loader)//(2**(self.e_state.subepoch_ce_check_freq))) * (i+1) for i in range(2**(self.e_state.subepoch_ce_check_freq)-1)]
+    ce_check_batches.append(len(self.train_loader)-1)
+
     for batch_idx, (data, target) in enumerate(self.train_loader):
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       
@@ -120,7 +113,7 @@ class Experiment:
       self.e_state.global_batch = (self.e_state.epoch - 1) * len(self.train_loader) + self.e_state.batch
       self.optimizer.zero_grad()
       
-      if self.cfg.complexity_type.name == 'PATH_NORM' or self.cfg.complexity_type.name == 'PATH_NORM_OVER_MARGIN':
+      if self.cfg.complexity_type in {ComplexityType.PATH_NORM, ComplexityType.PATH_NORM_OVER_MARGIN}:
         orig_model = deepcopy(self.model)
 
       logits = self.model(data)
@@ -129,7 +122,7 @@ class Experiment:
       cross_entropy.backward()
       loss = cross_entropy.clone()
 
-      if self.cfg.complexity_type.name == 'PATH_NORM' or self.cfg.complexity_type.name == 'PATH_NORM_OVER_MARGIN':
+      if self.cfg.complexity_type in {ComplexityType.PATH_NORM, ComplexityType.PATH_NORM_OVER_MARGIN}:
         for param in self.model.parameters():
           if param.requires_grad:
             param.data.pow_(2)
@@ -148,7 +141,7 @@ class Experiment:
       
       self.model.train()
 
-      if self.cfg.complexity_type.name == 'PATH_NORM' or self.cfg.complexity_type.name == 'PATH_NORM_OVER_MARGIN':
+      if self.cfg.complexity_type in {ComplexityType.PATH_NORM, ComplexityType.PATH_NORM_OVER_MARGIN}:
         for param, orig_param in zip(self.model.parameters(), orig_model.parameters()):
           if param.requires_grad:
             param.data = orig_param.data
@@ -160,7 +153,6 @@ class Experiment:
       if is_constrained:
         params_updated, check_global_convergence = self.lagrangian.update_parameters(np.mean(self.e_state.loss_hist), len(self.e_state.loss_hist), self.e_state.global_batch)
         if params_updated:
-          self.scheduler = self._reset_scheduler()
           self.printer.lagrangian_update(self.e_state, self.lagrangian.constraint_hist, self.lagrangian.lagrangian_mu, self.lagrangian.lagrangian_lambda)
       
       if check_global_convergence and not self.cfg.use_dataset_cross_entropy_stopping:
@@ -169,6 +161,18 @@ class Experiment:
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
       self.logger.log_batch_end(self.cfg, self.e_state, self.lagrangian, cross_entropy, complexity, loss, constraint)
+
+      # Cross-entropy stopping check
+      if self.cfg.use_dataset_cross_entropy_stopping and batch_idx == ce_check_batches[0]:
+        ce_check_batches.pop(0)
+        is_last_batch = batch_idx == (len(self.train_loader)-1)
+        dataset_ce = self.evaluate_cross_entropy(DatasetSubsetType.TRAIN, log=is_last_batch)[0]
+        if dataset_ce < self.cfg.global_convergence_target:
+          self.e_state.converged = True
+        else:
+          while len(self.e_state.subepoch_ce_check_milestones) > 0 and dataset_ce <= self.e_state.subepoch_ce_check_milestones[0]:
+            self.e_state.subepoch_ce_check_milestones.pop(0)
+            self.e_state.subepoch_ce_check_freq += 1
 
       if self.e_state.converged:
         break
@@ -181,24 +185,20 @@ class Experiment:
     for epoch in trange(self.e_state.epoch, self.cfg.epochs + 1, disable=(not self.cfg.use_tqdm)):
       self.e_state.epoch = epoch
       self._train_epoch()
-      if self.scheduler is not None:
-        self.scheduler.step() # DO NOT pass in epoch param, LR Scheduler is buggy
-
-
-      if not (epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0 or self.e_state.converged):
-        dataset_ce = self.evaluate_cross_entropy(DatasetSubsetType.TRAIN)
-        if (self.cfg.use_dataset_cross_entropy_stopping and dataset_ce < self.cfg.global_convergence_target):
-          self.e_state.converged = True
-      if epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0 or self.e_state.converged:
+      
+      is_evaluation_epoch = (epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0)
+      if is_evaluation_epoch or self.e_state.converged:
         train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.cfg.epochs or self.e_state.converged))
         val_eval = self.evaluate(DatasetSubsetType.VAL)
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
-        self.printer.epoch_metrics(self.cfg, self.e_state, self.lagrangian.constraint_hist, self.e_state.epoch, train_eval, val_eval)
+        self.printer.epoch_metrics(self.cfg, self.e_state, self.lagrangian.constraint_hist, epoch, train_eval, val_eval)
         self.result_save_callback(epoch, val_eval, train_eval)
 
-      if self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0:
+      # Save state
+      is_save_epoch = self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0
+      if is_save_epoch:
         self.save_state()
-      
+
       if self.e_state.converged:
         print('Converged')
         break
@@ -211,8 +211,24 @@ class Experiment:
       raise RuntimeError
     return val_eval, train_eval
 
+
   @torch.no_grad()
   def evaluate(self, dataset_subset_type: DatasetSubsetType, compute_all_measures: bool = False) -> EvaluationMetrics:
+    self.model.eval()
+    data_loader = [self.train_eval_loader, self.val_loader, self.test_loader][dataset_subset_type]
+
+    cross_entropy_loss, acc, complexity, constraint_loss, num_correct = self.evaluate_cross_entropy(dataset_subset_type, True, False)
+
+    all_complexities = {}
+    if dataset_subset_type == DatasetSubsetType.TRAIN and compute_all_measures:
+      all_complexities = get_all_measures(self.model, self.init_model, data_loader, acc)
+
+    self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
+
+    return EvaluationMetrics(acc, cross_entropy_loss, complexity, constraint_loss, num_correct, len(data_loader.dataset), all_complexities)
+
+  @torch.no_grad()
+  def evaluate_cross_entropy(self, dataset_subset_type: DatasetSubsetType, calculate_complexity: bool = False, log: bool = False):
     self.model.eval()
     cross_entropy_loss = 0
     constraint_loss = 0
@@ -225,52 +241,26 @@ class Experiment:
     for data, target in data_loader:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       logits = self.model(data)
-      complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type)
+      if calculate_complexity:
+        complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type)
       cross_entropy = F.cross_entropy(logits, target, reduction='sum')
       cross_entropy_loss += cross_entropy.item()  # sum up batch loss
-      total_loss, _, _ = self.lagrangian.make_loss(cross_entropy, complexity, self.e_state.epoch)
-      constraint_loss = (total_loss - cross_entropy).item()
+      if calculate_complexity:
+        total_loss, _, _ = self.lagrangian.make_loss(cross_entropy, complexity, self.e_state.epoch)
+        constraint_loss = (total_loss - cross_entropy).item()
       
       pred = logits.data.max(1, keepdim=True)[1]  # get the index of the max logits
       batch_correct = pred.eq(target.data.view_as(pred)).type(torch.FloatTensor).cpu()
       num_correct += batch_correct.sum()
 
-    complexity = complexity.item()
+    if calculate_complexity:
+      complexity = complexity.item()
     cross_entropy_loss /= num_to_evaluate_on
     acc = num_correct.item() / num_to_evaluate_on
-
-    all_complexities = {}
-    if dataset_subset_type == DatasetSubsetType.TRAIN and compute_all_measures:
-      all_complexities = get_all_measures(self.model, self.init_model, data_loader, acc)
-
-    self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
-
-    return EvaluationMetrics(acc, cross_entropy_loss, complexity, constraint_loss, num_correct, len(data_loader.dataset), all_complexities)
-
-  @torch.no_grad()
-  def evaluate_cross_entropy(self, dataset_subset_type: DatasetSubsetType) -> float:
-    self.model.eval()
-    cross_entropy_loss = 0
-    num_correct = 0
-
-    data_loader = [self.train_eval_loader, self.val_loader, self.test_loader][dataset_subset_type]
-    num_to_evaluate_on = len(data_loader.dataset)
-
-    for data, target in data_loader:
-      data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
-      logits = self.model(data)
-      cross_entropy = F.cross_entropy(logits, target, reduction='sum')
-      cross_entropy_loss += cross_entropy.item()  # sum up batch loss
-      
-      pred = logits.data.max(1, keepdim=True)[1]  # get the index of the max logits
-      batch_correct = pred.eq(target.data.view_as(pred)).type(torch.FloatTensor).cpu()
-      num_correct += batch_correct.sum()
-
-    cross_entropy_loss /= num_to_evaluate_on
-    acc = num_correct.item() / num_to_evaluate_on
-
-    self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
-    return cross_entropy_loss
+    
+    if log:
+      self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
+    return cross_entropy_loss, acc, complexity, constraint_loss, num_correct
 
   def save_state(self) -> None:
     checkpoint_path = self.cfg.checkpoint_dir / str(self.e_state.id)

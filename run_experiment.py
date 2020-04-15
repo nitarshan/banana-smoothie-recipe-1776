@@ -56,6 +56,7 @@ def single(
   global_convergence_tolerance: Optional[float] = None,
   global_convergence_patience: Optional[int] = None,
   global_convergence_target: Optional[float] = None,
+  global_convergence_evaluation_freq_milestones: Optional[List[float]] = None,
   use_cuda: bool = True,
   comet_api_key: Optional[str] = None,
   comet_tag: Optional[str] = None,
@@ -105,6 +106,7 @@ def single(
     global_convergence_tolerance=global_convergence_tolerance,
     global_convergence_patience=global_convergence_patience,
     global_convergence_target=global_convergence_target,
+    global_convergence_evaluation_freq_milestones=global_convergence_evaluation_freq_milestones,
     log_dir=log_path,
     data_dir=data_path,
     checkpoint_dir=checkpoint_path,
@@ -115,6 +117,7 @@ def single(
   e_state = ETrainingState(
     id=experiment_id,
     loss_hist=deque([], lagrangian_patience_batches or 1),
+    subepoch_ce_check_milestones=global_convergence_evaluation_freq_milestones.copy(),
   )
 
   def dump_results(epoch, val_eval, train_eval):

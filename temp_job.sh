@@ -18,7 +18,7 @@ cp -r /network/data1/cifar/cifar-10-batches-py $SLURM_TMPDIR/data/
 
 # 3. Launch your job
 echo "Launching Experiment"
-tag="dataset_cross_entropy_stop_intervention"
+tag="dataset_cross_entropy_stop_intervention_2"
 model=DEEP
 dataset=MNIST
 optims="SGD_MOMENTUM"
@@ -26,7 +26,7 @@ lagrangian_types="PENALTY"
 measures="L2 L2_DIST SUM_OF_SPEC"
 targets="7 10 20 40"
 ce_target="0.05"
-lrs="0.001 0.01 0.1"
+lrs="0.001 0.005 0.01 0.03"
 widths="30 60 100"
 depths="1 2 3"
 global_idx=0
@@ -65,6 +65,7 @@ python run_experiment.py single \
 --global_convergence_tolerance=1e-8 \
 --global_convergence_patience=30 \
 --global_convergence_target=$ce_target \
+--global_convergence_evaluation_freq_milestones=[0.09,0.07,0.06] \
 --comet_api_key=$COMET_API_KEY \
 --log_epoch_freq=10 \
 --comet_tag=$tag \

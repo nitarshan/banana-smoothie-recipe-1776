@@ -102,6 +102,8 @@ class ETrainingState:
   global_batch: int = 1
   loss_hist: Deque[float] = deque([])
   converged: bool = False
+  subepoch_ce_check_freq: int = 0
+  subepoch_ce_check_milestones: List[int] = None
 
 # Configuration for the experiment
 @dataclass(frozen=True)
@@ -137,6 +139,7 @@ class EConfig:
   global_convergence_tolerance: Optional[float] = None
   global_convergence_patience: Optional[int] = None
   global_convergence_target: Optional[float] = None
+  global_convergence_evaluation_freq_milestones: Optional[List[float]] = None
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = 100
   log_epoch_freq: Optional[int] = 20
