@@ -111,6 +111,7 @@ class Experiment:
       
       self.e_state.batch = batch_idx
       self.e_state.global_batch = (self.e_state.epoch - 1) * len(self.train_loader) + self.e_state.batch
+      self.model.train()
       self.optimizer.zero_grad()
       
       if self.cfg.complexity_type in {ComplexityType.PATH_NORM, ComplexityType.PATH_NORM_OVER_MARGIN}:
