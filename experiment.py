@@ -196,7 +196,7 @@ class Experiment:
         self.result_save_callback(epoch, val_eval, train_eval)
 
       # Save state
-      is_save_epoch = self.cfg.save_epoch_freq is not None and epoch % self.cfg.save_epoch_freq == 0
+      is_save_epoch = self.cfg.save_epoch_freq is not None and (epoch % self.cfg.save_epoch_freq == 0 or epoch==self.cfg.epochs or self.e_state.converged)
       if is_save_epoch:
         self.save_state()
 
