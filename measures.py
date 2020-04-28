@@ -1,25 +1,23 @@
 from contextlib import contextmanager
 from copy import deepcopy
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional
 
 import numpy as np
 import torch
-from torch.nn.parameter import Parameter
 from torch.utils.data.dataloader import DataLoader
 
 from experiment_config import ComplexityType as CT
 from models import ExperimentBaseModel
 
 
-def get_weights_only(model: ExperimentBaseModel) -> List[torch.nn.Parameter]:
-  return [p for name, p in model.named_parameters() if '.bias' not in name and '.bn' not in name and 'bn1' not in name and 'downsample.1' not in name]
+def get_weights_only(model: ExperimentBaseModel) -> List[torch.Tensor]:
+  return [p.view(p.shape[0],-1) for name, p in model.named_parameters() if 'bias' not in name and 'bn' not in name and 'downsample.1' not in name]
 
-def get_flat_params(weights_only: Union[List[torch.nn.Parameter], List[torch.Tensor]]) -> torch.Tensor:
+def get_flat_params(weights_only: List[torch.Tensor]) -> torch.Tensor:
   return torch.cat([p.view(-1) for p in weights_only], dim=0)
 
 def get_parameter_norms(
-  weights_only: Union[List[torch.nn.Parameter],
-  List[torch.Tensor]],
+  weights_only: List[torch.Tensor],
   norm_type: str
 ) -> torch.Tensor:
   if norm_type == 'fro':
@@ -124,29 +122,29 @@ def _path_norm_interv(model: ExperimentBaseModel) -> torch.Tensor:
 def _param_count(model: ExperimentBaseModel) -> int:
   return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-def _l2_norm(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
+def _l2_norm(weights_only: List[torch.Tensor]) -> torch.Tensor:
   return get_flat_params(weights_only).norm(p=2)
 
-def _l2_dist(weights_only: List[torch.nn.Parameter], init_weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
+def _l2_dist(weights_only: List[torch.Tensor], init_weights_only: List[torch.Tensor]) -> torch.Tensor:
   return get_flat_params([(p - q) for p, q in zip(weights_only, init_weights_only)]).norm(p=2)
 
-def _log_prod_of_fro(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
+def _log_prod_of_fro(weights_only: List[torch.Tensor]) -> torch.Tensor:
   ret = get_parameter_norms(weights_only, 'fro').log().sum()
   return ret
 
-def _param_norm(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
+def _param_norm(weights_only: List[torch.Tensor]) -> torch.Tensor:
   return get_parameter_norms(weights_only, 'fro').sum()
 
-def _log_spec_norm(weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
+def _log_spec_norm(weights_only: List[torch.Tensor]) -> torch.Tensor:
   return get_parameter_norms(weights_only, 'spec').log().sum()
 
-def _fro_dist(weights_only: List[torch.nn.Parameter], init_weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
+def _fro_dist(weights_only: List[torch.Tensor], init_weights_only: List[torch.Tensor]) -> torch.Tensor:
   return get_parameter_norms([(p - q) for p, q in zip(weights_only, init_weights_only)], 'fro').sum()
 
-def _spec_dist(weights_only: List[torch.nn.Parameter], init_weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
+def _spec_dist(weights_only: List[torch.Tensor], init_weights_only: List[torch.Tensor]) -> torch.Tensor:
   return get_parameter_norms([(p - q) for p, q in zip(weights_only, init_weights_only)], 'spec').sum()
 
-def _fro_over_spec(weights_only: List[torch.nn.Parameter], init_weights_only: List[torch.nn.Parameter]) -> torch.Tensor:
+def _fro_over_spec(weights_only: List[torch.Tensor], init_weights_only: List[torch.Tensor]) -> torch.Tensor:
   fro_weight_norms = get_parameter_norms(weights_only, 'fro')
   spec_weight_norms = get_parameter_norms(weights_only, 'spec')
   return (fro_weight_norms / spec_weight_norms).sum()
@@ -163,8 +161,8 @@ def _pacbayes_mag_bound(
   eps: float,
   omega: int,
   m: int,
-  weights_only: List[Parameter],
-  init_weights_only: List[Parameter],
+  weights_only: List[torch.Tensor],
+  init_weights_only: List[torch.Tensor],
   orig: bool
 ) -> torch.Tensor:
   flat_params = get_flat_params(weights_only)

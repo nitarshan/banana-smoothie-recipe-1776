@@ -20,7 +20,7 @@ class ExperimentBaseModel(nn.Module):
 
 def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
   if e_config.model_type == ModelType.DEEP:
-    return DeepNet(e_config.model_shape, e_config.dataset_type)
+    return MLP(e_config.model_shape, e_config.dataset_type)
   elif e_config.model_type == ModelType.CONV:
     return ConvNet(e_config.dataset_type)
   elif e_config.model_type == ModelType.RESNET:
@@ -28,9 +28,13 @@ def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
     width = e_config.model_shape[0]
     stack_planes = e_config.model_shape[2:]
     return ResNet(e_config.dataset_type, depth, width, [16,32,64])
+  elif e_config.model_type == ModelType.NIN:
+    depth = len(e_config.model_shape)
+    width = e_config.model_shape[0]
+    return NiN(depth, width, e_config.dataset_type)
   raise KeyError
 
-class DeepNet(ExperimentBaseModel):
+class MLP(ExperimentBaseModel):
   def __init__(self, hidden_sizes: List[int], dataset_type: DatasetType):
     super().__init__(dataset_type)
     self.hidden_size = hidden_sizes
@@ -65,6 +69,68 @@ class ConvNet(ExperimentBaseModel):
     x = F.relu(self.fc2(x))
     x = self.fc3(x)
     return x
+
+
+class NiNBlock(nn.Module):
+  def __init__(self, inplanes: int, planes: int) -> None:
+    super().__init__()
+    self.relu = nn.ReLU(inplace=True)
+
+    self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=3, stride=2, padding=1)
+    self.bn1 = nn.BatchNorm2d(planes)
+
+    self.conv2 = nn.Conv2d(planes, planes, kernel_size=1, stride=1)
+    self.bn2 = nn.BatchNorm2d(planes)
+
+    self.conv3 = nn.Conv2d(planes, planes, kernel_size=1, stride=1)
+    self.bn3 = nn.BatchNorm2d(planes)
+  
+  def forward(self, x):
+    x = self.conv1(x)
+    x = self.bn1(x)
+    x = self.relu(x)
+
+    x = self.conv2(x)
+    x = self.bn2(x)
+    x = self.relu(x)
+
+    x = self.conv3(x)
+    x = self.bn3(x)
+    x = self.relu(x)
+
+    return x
+
+
+class NiN(ExperimentBaseModel):
+  def __init__(self, depth: int, width: int, dataset_type: DatasetType) -> None:
+    super().__init__(dataset_type)
+
+    self.base_width = 96
+
+    blocks = []
+    blocks.append(NiNBlock(self.dataset_properties.D[0], self.base_width*width))
+    for _ in range(depth-1):
+      blocks.append(NiNBlock(self.base_width*width,self.base_width*width))
+    self.blocks = nn.Sequential(*blocks)
+
+    self.relu = nn.ReLU(inplace=True)
+
+    self.conv = nn.Conv2d(self.base_width*width, self.dataset_properties.K, kernel_size=1, stride=1)
+    self.bn = nn.BatchNorm2d(10)
+
+    self.avgpool = nn.AdaptiveAvgPool2d((1,1))
+
+  def forward(self, x):
+    x = self.blocks(x)
+
+    x = self.conv(x)
+    x = self.bn(x)
+    x = self.relu(x)
+    
+    x = self.avgpool(x)
+    
+    return x.squeeze()
+
 
 class BasicBlock(nn.Module):
   def __init__(self, inplanes: int, planes: int, stack_idx: int, block_idx: int):

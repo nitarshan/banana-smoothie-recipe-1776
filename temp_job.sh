@@ -8,7 +8,7 @@ conda activate base
 conda activate ccm
 
 # 2. Prepare directories and copy dataset onto the compute node
-echo "Loading Datasets"
+echo "Loading Datasets!"
 mkdir -p /network/tmp1/$USER/results
 mkdir -p $SLURM_TMPDIR/data/MNIST/
 mkdir -p $SLURM_TMPDIR/results/
@@ -18,17 +18,17 @@ cp -r /network/data1/cifar/cifar-10-batches-py $SLURM_TMPDIR/data/
 
 # 3. Launch your job
 echo "Launching Experiment"
-tag="dataset_cross_entropy_stop_intervention_2"
-model=DEEP
-dataset=MNIST
+tag="nin_test"
+model="NIN"
+dataset="CIFAR10"
 optims="SGD_MOMENTUM"
-lagrangian_types="PENALTY"
-measures="L2 L2_DIST LOG_SUM_OF_SPEC"
-targets="7 10 20 40"
+lagrangian_types="NONE"
+measures="L2"
+targets="7"
 ce_target="0.05"
-lrs="0.001 0.005 0.01 0.03"
-widths="30 60 100"
-depths="1 2 3"
+lrs="0.01"
+widths="2"
+depths="2"
 global_idx=0
 jobs_per_gpu=5
 
@@ -42,10 +42,10 @@ for depth in $depths; do
 let "global_idx++"
 python run_experiment.py single \
 --root_dir=$SLURM_TMPDIR \
---model_type=DEEP \
+--model_type=$model \
 --model_depth=$depth \
 --model_width=$width \
---dataset_type=MNIST \
+--dataset_type=$dataset \
 --optimizer_type=$optim \
 --lr=$lr \
 --epochs=150 \
@@ -71,7 +71,8 @@ python run_experiment.py single \
 --comet_tag=$tag \
 --use_cuda \
 --use_wandb \
---use_dataset_cross_entropy_stopping &
+--use_dataset_cross_entropy_stopping \
+--use_tqdm
 if (( $global_idx % $jobs_per_gpu == 0 )); then
     wait
 fi
