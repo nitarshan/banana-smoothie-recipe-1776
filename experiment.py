@@ -36,8 +36,12 @@ class Experiment:
       self.cfg: EConfig = e_config
 
     # Random Seeds
-    torch.manual_seed(self.cfg.seed)
+    random.seed(self.cfg.seed)
     np.random.seed(self.cfg.seed)
+    torch.manual_seed(self.cfg.seed)
+    torch.cuda.manual_seed_all(self.cfg.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     # Logging
     if logger is None:
