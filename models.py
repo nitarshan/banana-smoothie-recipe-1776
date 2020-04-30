@@ -105,7 +105,7 @@ class NiN(ExperimentBaseModel):
   def __init__(self, depth: int, width: int, dataset_type: DatasetType) -> None:
     super().__init__(dataset_type)
 
-    self.base_width = 96
+    self.base_width = 32
 
     blocks = []
     blocks.append(NiNBlock(self.dataset_properties.D[0], self.base_width*width))
