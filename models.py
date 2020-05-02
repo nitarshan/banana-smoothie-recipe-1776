@@ -31,7 +31,7 @@ def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
   elif e_config.model_type == ModelType.NIN:
     depth = len(e_config.model_shape)
     width = e_config.model_shape[0]
-    return NiN(depth, width, e_config.dataset_type)
+    return NiN(depth, width, e_config.base_width, e_config.dataset_type)
   raise KeyError
 
 class MLP(ExperimentBaseModel):
@@ -102,10 +102,10 @@ class NiNBlock(nn.Module):
 
 
 class NiN(ExperimentBaseModel):
-  def __init__(self, depth: int, width: int, dataset_type: DatasetType) -> None:
+  def __init__(self, depth: int, width: int, base_width: int, dataset_type: DatasetType) -> None:
     super().__init__(dataset_type)
 
-    self.base_width = 32
+    self.base_width = base_width
 
     blocks = []
     blocks.append(NiNBlock(self.dataset_properties.D[0], self.base_width*width))

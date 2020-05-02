@@ -152,6 +152,7 @@ class EConfig:
   verbosity: Verbosity = Verbosity.NONE
   use_tqdm: bool = False
   use_dataset_cross_entropy_stopping: bool = False
+  base_width: int = 32
 
   # Validation
   def __post_init__(self):

@@ -69,6 +69,7 @@ def single(
   use_wandb: bool = False,
   use_tqdm: bool = False,
   use_dataset_cross_entropy_stopping: bool = False,
+  base_width: int = 32,
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
@@ -113,6 +114,7 @@ def single(
     verbosity=Verbosity.LAGRANGIAN,
     use_tqdm=use_tqdm,
     use_dataset_cross_entropy_stopping=use_dataset_cross_entropy_stopping,
+    base_width=base_width,
   )
   e_state = ETrainingState(
     id=experiment_id,
