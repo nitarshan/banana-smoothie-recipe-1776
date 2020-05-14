@@ -62,7 +62,7 @@ def single(
   comet_tag: Optional[str] = None,
   logger: Optional[object] = None,
   log_epoch_freq: Optional[int] = 20,
-  save_epoch_freq: Optional[int] = None,
+  save_epoch_freq: Optional[int] = 1,
   seed: Optional[int] = None,
   data_seed: Optional[int] = None,
   data_dir: Optional[str] = None,
@@ -78,7 +78,7 @@ def single(
   results_path, log_path, data_path, checkpoint_path = setup_paths(root_dir, experiment_id, data_dir)
 
   if seed is None:
-    seed = experiment_id % (2**32)
+    seed = 0
   e_config = EConfig(
     seed=seed,
     data_seed=data_seed,

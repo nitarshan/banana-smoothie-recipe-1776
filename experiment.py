@@ -28,13 +28,7 @@ class Experiment:
   ):
     self.e_state = e_state
     self.device = device
-    resume_from_checkpoint = (e_config is None) or e_config.resume_from_checkpoint
-
-    if resume_from_checkpoint:
-      cfg_state, model_state, optim_state, np_rng_state, torch_rng_state = self.load_state()
-      self.cfg: EConfig = cfg_state
-    if e_config is not None:
-      self.cfg: EConfig = e_config
+    self.cfg = e_config
 
     # Random Seeds
     random.seed(self.cfg.seed)
@@ -89,12 +83,38 @@ class Experiment:
     # Load data
     self.train_loader, self.train_eval_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device, self.cfg.data_seed)
 
-    # Cleanup when resuming from checkpoint
-    if resume_from_checkpoint:
-      self.model.load_state_dict(model_state)
-      self.optimizer.load_state_dict(optim_state)
-      np.random.set_state(np_rng_state)
-      torch.set_rng_state(torch_rng_state)
+    # Resume from checkpoint if available
+    self.load_state()
+
+  def save_state(self) -> None:
+    checkpoint_file = self.cfg.checkpoint_dir / (self.cfg.md5 + '.pt')
+    print(checkpoint_file)
+    torch.save({
+      'config': self.cfg,
+      'state': self.e_state,
+      'model': self.model.state_dict(),
+      'optimizer': self.optimizer.state_dict(),
+      'detector': self.detector,
+      'lagrangian': self.lagrangian,
+      'np_rng': np.random.get_state(),
+      'torch_rng': torch.get_rng_state(),
+    }, checkpoint_file)
+
+  def load_state(self) -> None:
+    try:
+      checkpoint_file = self.cfg.checkpoint_dir / (self.cfg.md5 + '.pt')
+      checkpoint = torch.load(checkpoint_file)
+      if checkpoint is not None:
+        self.e_state = checkpoint['state']
+        self.model.load_state_dict(checkpoint['model'])
+        self.optimizer.load_state_dict(checkpoint['optimizer'])
+        self.detector = checkpoint['detector']
+        self.lagrangian = checkpoint['lagrangian']
+        np.random.set_state(checkpoint['np_rng'])
+        torch.set_rng_state(checkpoint['torch_rng'])
+      print('loading from checkpoint')
+    except FileNotFoundError:
+      print('no checkpoint found')
 
   def _reset_optimizer(self) -> torch.optim.Optimizer:
     if self.cfg.optimizer_type == OptimizerType.SGD:
@@ -268,19 +288,3 @@ class Experiment:
       self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
     return cross_entropy_loss, acc, complexity, constraint_loss, num_correct
 
-  def save_state(self) -> None:
-    checkpoint_path = self.cfg.checkpoint_dir / str(self.e_state.id)
-    checkpoint_path.mkdir(parents=True, exist_ok=True)
-    checkpoint_file = checkpoint_path / (str(self.e_state.epoch) + '.pt')
-    torch.save({
-      'config': self.cfg,
-      'model': self.model.state_dict(),
-      'optimizer': self.optimizer.state_dict(),
-      'np_rng': np.random.get_state(),
-      'torch_rng': torch.get_rng_state(),
-    }, checkpoint_file)
-
-  def load_state(self) -> Tuple[EConfig, dict, dict, np.ndarray, torch.ByteTensor]:
-    checkpoint_file = self.cfg.checkpoint_dir / str(self.e_state.id) / (str(self.e_state.epoch - 1) + '.pt')
-    checkpoint = torch.load(checkpoint_file)
-    return checkpoint['config'], checkpoint['model'], checkpoint['optimizer'], checkpoint['np_rng'], checkpoint['torch_rng']

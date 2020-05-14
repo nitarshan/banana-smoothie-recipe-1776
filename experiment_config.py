@@ -1,6 +1,7 @@
 from collections import deque
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
+import hashlib
 from pathlib import Path
 from typing import Deque, Dict, List, NamedTuple, Optional
 
@@ -144,7 +145,7 @@ class EConfig:
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = 100
   log_epoch_freq: Optional[int] = 20
-  save_epoch_freq: Optional[int] = None
+  save_epoch_freq: Optional[int] = 1
   data_dir: Path = Path('data')
   log_dir: Path = Path('logs')
   checkpoint_dir: Path = Path('checkpoints')
@@ -209,6 +210,10 @@ class EConfig:
     del d["verbosity"]
 
     return d
+
+  @property
+  def md5(self):
+    return hashlib.md5(str(self).encode('utf-8')).hexdigest()
 
 class EvaluationMetrics(NamedTuple):
   acc: float
