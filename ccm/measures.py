@@ -6,8 +6,8 @@ import numpy as np
 import torch
 from torch.utils.data.dataloader import DataLoader
 
-from experiment_config import ComplexityType as CT
-from models import ExperimentBaseModel
+from .experiment_config import ComplexityType as CT
+from .models import ExperimentBaseModel
 
 
 def get_weights_only(model: ExperimentBaseModel) -> List[torch.Tensor]:

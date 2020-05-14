@@ -5,8 +5,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dataset_helpers import get_dataset_properties
-from experiment_config import DatasetType, EConfig, ModelType
+from .dataset_helpers import get_dataset_properties
+from .experiment_config import DatasetType, EConfig, ModelType
 
 
 class ExperimentBaseModel(nn.Module):

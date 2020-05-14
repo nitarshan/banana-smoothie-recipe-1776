@@ -4,7 +4,7 @@ from typing import Tuple
 import numpy as np
 import torch
 
-from experiment_config import LagrangianType
+from .experiment_config import LagrangianType
 
 class Lagrangian(object):
   def __init__(

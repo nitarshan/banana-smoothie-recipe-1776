@@ -5,14 +5,14 @@ import time
 from typing import Optional, Tuple, List
 from collections import deque
 
-from logs import CometLogger, WandbLogger
 import fire
 import torch
 
-from experiment import Experiment
-from experiment_config import (
+from ccm.experiment import Experiment
+from ccm.experiment_config import (
   ComplexityType, DatasetType, EConfig, ETrainingState, LagrangianType,
   ModelType, OptimizerType, Verbosity)
+from ccm.logs import CometLogger, WandbLogger
 
 def setup_paths(root_dir: str, experiment_id: int, data_dir: Optional[str]) -> Tuple[Path, Path, Path, Path]:
   print('[Experiment {}] Setting up directories'.format(experiment_id))

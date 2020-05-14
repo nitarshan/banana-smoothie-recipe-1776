@@ -7,14 +7,14 @@ import torch
 import torch.nn.functional as F
 from tqdm import trange
 
-from convergence_detection import ConvergeOnPlateau
-from dataset_helpers import get_dataloaders
-from experiment_config import (
+from .convergence_detection import ConvergeOnPlateau
+from .dataset_helpers import get_dataloaders
+from .experiment_config import (
   ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, OptimizerType)
-from lagrangian import Lagrangian
-from logs import BaseLogger, DefaultLogger, Printer
-from measures import get_all_measures, get_single_measure
-from models import get_model_for_config
+from .lagrangian import Lagrangian
+from .logs import BaseLogger, DefaultLogger, Printer
+from .measures import get_all_measures, get_single_measure
+from .models import get_model_for_config
 
 
 class Experiment:
@@ -89,7 +89,6 @@ class Experiment:
 
   def save_state(self) -> None:
     checkpoint_file = self.cfg.checkpoint_dir / (self.cfg.md5 + '.pt')
-    print(checkpoint_file)
     torch.save({
       'config': self.cfg,
       'state': self.e_state,

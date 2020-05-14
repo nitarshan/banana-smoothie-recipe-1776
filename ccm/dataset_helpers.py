@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 import torchvision as tv
 
-from experiment_config import DatasetType
+from .experiment_config import DatasetType
 
 @dataclass(frozen=True)
 class DatasetProperties:
