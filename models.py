@@ -6,8 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dataset_helpers import get_dataset_properties
-from experiment_config import DatasetType, ComplexityType, EConfig, ModelType
-from torchvision.models import resnet18
+from experiment_config import DatasetType, EConfig, ModelType
 
 
 class ExperimentBaseModel(nn.Module):
@@ -20,28 +19,22 @@ class ExperimentBaseModel(nn.Module):
 
 def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
   if e_config.model_type == ModelType.DEEP:
-    return MLP(e_config.model_shape, e_config.dataset_type)
+    return MLP(e_config.model_depth, e_config.model_width, e_config.dataset_type)
   elif e_config.model_type == ModelType.CONV:
     return ConvNet(e_config.dataset_type)
   elif e_config.model_type == ModelType.RESNET:
-    depth = len(e_config.model_shape)
-    width = e_config.model_shape[0]
-    stack_planes = e_config.model_shape[2:]
-    return ResNet(e_config.dataset_type, depth, width, [16,32,64])
+    return ResNet(e_config.dataset_type, e_config.model_depth, e_config.model_width, [16,32,64])
   elif e_config.model_type == ModelType.NIN:
-    depth = len(e_config.model_shape)
-    width = e_config.model_shape[0]
-    return NiN(depth, width, e_config.base_width, e_config.dataset_type)
+    return NiN(e_config.model_depth, e_config.model_width, e_config.base_width, e_config.dataset_type)
   raise KeyError
 
 class MLP(ExperimentBaseModel):
-  def __init__(self, hidden_sizes: List[int], dataset_type: DatasetType):
+  def __init__(self, depth: int, width: int, dataset_type: DatasetType):
     super().__init__(dataset_type)
-    self.hidden_size = hidden_sizes
     self.layers = nn.ModuleList(
-      [nn.Linear(np.prod(self.dataset_properties.D), hidden_sizes[0])] + # Input
-      [nn.Linear(hidden_sizes[i], hidden_sizes[i+1]) for i in range(len(hidden_sizes)-1)] + # Hidden
-      [nn.Linear(hidden_sizes[-1], self.dataset_properties.K)]) # Output
+      [nn.Linear(np.prod(self.dataset_properties.D), width)] + # Input
+      [nn.Linear(width, width) for i in range(depth-1)] + # Hidden
+      [nn.Linear(width, self.dataset_properties.K)]) # Output
 
   def forward(self, x) -> torch.Tensor:
     x = x.view(-1, np.prod(self.dataset_properties.D))
