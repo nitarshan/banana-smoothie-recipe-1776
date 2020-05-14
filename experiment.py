@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Optional, Tuple
+from typing import Optional
 import random
 
 import numpy as np
@@ -22,14 +22,14 @@ class Experiment:
     self,
     e_state: ETrainingState,
     device: torch.device,
-    e_config: Optional[EConfig] = None,
+    e_config: EConfig = None,
     logger: Optional[BaseLogger] = None,
     result_save_callback: Optional[object] = None
   ):
     self.e_state = e_state
     self.device = device
     self.cfg = e_config
-
+    
     # Random Seeds
     random.seed(self.cfg.seed)
     np.random.seed(self.cfg.seed)
@@ -81,7 +81,8 @@ class Experiment:
     )
 
     # Load data
-    self.train_loader, self.train_eval_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device, self.cfg.data_seed)
+    self.train_loader, self.train_eval_loader, self.val_loader, self.test_loader = \
+      get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device, self.cfg.data_seed)
 
     # Resume from checkpoint if available
     self.load_state()
@@ -203,7 +204,7 @@ class Experiment:
       if self.e_state.converged:
         break
 
-  def train(self) -> Tuple[EvaluationMetrics, EvaluationMetrics]:
+  def train(self) -> None:
     self.printer.train_start(self.device)
     train_eval, val_eval = None, None
     
@@ -235,7 +236,6 @@ class Experiment:
 
     if train_eval is None or val_eval is None:
       raise RuntimeError
-    return val_eval, train_eval
 
 
   @torch.no_grad()
@@ -287,4 +287,3 @@ class Experiment:
     if log:
       self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
     return cross_entropy_loss, acc, complexity, constraint_loss, num_correct
-

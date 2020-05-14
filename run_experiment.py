@@ -139,7 +139,7 @@ def single(
       logger = WandbLogger(comet_tag, e_config.to_tensorboard_dict())
     elif comet_api_key is not None:
       logger = CometLogger(comet_api_key, comet_tag, e_config.to_tensorboard_dict())
-  val_eval, train_eval = Experiment(e_state, device, e_config, logger, dump_results).train()
+  Experiment(e_state, device, e_config, logger, dump_results).train()
 
 if __name__ == '__main__':
   try:
