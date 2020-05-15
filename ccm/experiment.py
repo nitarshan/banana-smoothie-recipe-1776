@@ -112,7 +112,7 @@ class Experiment:
         self.lagrangian = checkpoint['lagrangian']
         np.random.set_state(checkpoint['np_rng'])
         torch.set_rng_state(checkpoint['torch_rng'])
-      print('loading from checkpoint')
+      print(f'loading from checkpoint at epoch {self.e_state.epoch} global batch {self.e_state.global_batch')
     except FileNotFoundError:
       print('no checkpoint found')
 
