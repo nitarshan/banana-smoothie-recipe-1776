@@ -107,7 +107,7 @@ def _path_norm_observ(model: ExperimentBaseModel) -> torch.Tensor:
   for param in model.parameters():
     if param.requires_grad:
       param.data.pow_(2)
-  x = torch.ones([1] + model.dataset_properties.D, device=device)
+  x = torch.ones([1] + model.dataset_type.D, device=device)
   x = model(x)
   del model
   return x.sum().sqrt()
@@ -115,7 +115,7 @@ def _path_norm_observ(model: ExperimentBaseModel) -> torch.Tensor:
 def _path_norm_interv(model: ExperimentBaseModel) -> torch.Tensor:
   device = next(model.parameters()).device
   model.eval()
-  x = torch.ones([1] + model.dataset_properties.D, device=device)
+  x = torch.ones([1] + model.dataset_type.D, device=device)
   x = model(x)
   return x.sum().sqrt()
 

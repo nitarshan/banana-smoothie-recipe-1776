@@ -9,20 +9,6 @@ import torchvision as tv
 
 from .experiment_config import DatasetType
 
-@dataclass(frozen=True)
-class DatasetProperties:
-  name: DatasetType
-  D: List[int]
-  K: int
-
-def get_dataset_properties(dataset_name: DatasetType) -> DatasetProperties:
-  if dataset_name == DatasetType.MNIST:
-    return DatasetProperties(DatasetType.MNIST, [1, 28, 28], 10)
-  elif dataset_name == DatasetType.CIFAR10:
-    return DatasetProperties(DatasetType.CIFAR10, [3, 32, 32], 10)
-  elif dataset_name == DatasetType.CIFAR100:
-    return DatasetProperties(DatasetType.CIFAR100, [3, 32, 32], 100)
-  raise KeyError()
 
 def get_dataloaders(dataset_name: DatasetType, data_path: Path, batch_size: int, device: torch.device, seed: Optional[int] = None) -> Tuple[DataLoader, DataLoader, DataLoader, DataLoader]:
   if dataset_name == DatasetType.MNIST:
