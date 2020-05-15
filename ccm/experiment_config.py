@@ -149,9 +149,8 @@ class EConfig:
   log_batch_freq: Optional[int] = 100
   log_epoch_freq: Optional[int] = 20
   save_epoch_freq: Optional[int] = 1
+  root_dir: Path = Path('.')
   data_dir: Path = Path('data')
-  log_dir: Path = Path('logs')
-  checkpoint_dir: Path = Path('checkpoints')
   verbosity: Verbosity = Verbosity.NONE
   use_tqdm: bool = False
   use_dataset_cross_entropy_stopping: bool = False
@@ -177,6 +176,22 @@ class EConfig:
       }
       if None in augmented_params:
         raise KeyError
+
+    # Set up directories
+    for directory in ('results', 'logs', 'checkpoints'):
+      (self.root_dir / directory).mkdir(parents=True, exist_ok=True)
+
+  @property
+  def log_dir(self):
+    return self.root_dir / 'logs'
+
+  @property
+  def checkpoint_dir(self):
+    return self.root_dir / 'checkpoints'
+  
+  @property
+  def results_dir(self):
+    return self.root_dir / 'results'
 
   def to_tensorboard_dict(self) -> dict:
     d = asdict(self)
