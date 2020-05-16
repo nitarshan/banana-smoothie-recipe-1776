@@ -1,16 +1,19 @@
 from collections import deque
 from dataclasses import asdict, dataclass
 from enum import Enum, IntEnum
+import hashlib
 from pathlib import Path
 from typing import Deque, Dict, List, NamedTuple, Optional
 
-from numpy import infty
-
 
 class DatasetType(Enum):
-  MNIST = 1
-  CIFAR10 = 2
-  CIFAR100 = 3
+  MNIST = (1, (1, 28, 28), 10)
+  CIFAR10 = (2, (3, 32, 32), 10)
+  CIFAR100 = (3, (3, 32, 32), 100)
+  
+  def __init__(self, id, D, K):
+    self.D = D
+    self.K = K
 
 class DatasetSubsetType(IntEnum):
   TRAIN = 0
@@ -109,17 +112,18 @@ class ETrainingState:
 # Configuration for the experiment
 @dataclass(frozen=True)
 class EConfig:
-  seed: int
-  data_seed: Optional[int]
-  use_cuda: bool
+  seed: int = 0
+  data_seed: Optional[int] = None
+  use_cuda: bool = True
   # Model
-  model_type: ModelType
-  model_shape: List[int]
+  model_type: ModelType = ModelType.NIN
+  model_depth: int = 4
+  model_width: int = 1
   # Dataset
-  dataset_type: DatasetType
+  dataset_type: DatasetType = DatasetType.CIFAR10
   # Training
-  batch_size: int
-  epochs: int
+  batch_size: int = 128
+  epochs: int = 100
   optimizer_type: OptimizerType = OptimizerType.SGD
   lr: float = 0.001
   complexity_type: ComplexityType = ComplexityType.NONE
@@ -144,11 +148,9 @@ class EConfig:
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = 100
   log_epoch_freq: Optional[int] = 20
-  save_epoch_freq: Optional[int] = None
+  save_epoch_freq: Optional[int] = 1
+  root_dir: Path = Path('.')
   data_dir: Path = Path('data')
-  log_dir: Path = Path('logs')
-  checkpoint_dir: Path = Path('checkpoints')
-  resume_from_checkpoint: bool = False
   verbosity: Verbosity = Verbosity.NONE
   use_tqdm: bool = False
   use_dataset_cross_entropy_stopping: bool = False
@@ -157,58 +159,50 @@ class EConfig:
   # Validation
   def __post_init__(self):
     if self.lagrangian_type != LagrangianType.NONE:
-      if self.lagrangian_start_epoch is None:
-        raise KeyError
-      if self.lagrangian_target is None:
-        raise KeyError
-      if self.lagrangian_tolerance is None:
-        raise KeyError
-      if self.lagrangian_start_mu is None:
-        raise KeyError
-      if self.lagrangian_patience_batches is None:
-        raise KeyError
-      if self.lagrangian_improvement_rate is None:
+      lagrangian_params = {
+        self.lagrangian_start_epoch,
+        self.lagrangian_target,
+        self.lagrangian_tolerance,
+        self.lagrangian_start_mu,
+        self.lagrangian_patience_batches,
+        self.lagrangian_improvement_rate,
+      }
+      if None in lagrangian_params:
         raise KeyError
     if self.lagrangian_type == LagrangianType.AUGMENTED:
-      if self.lagrangian_start_lambda is None:
+      augmented_params = {
+        self.lagrangian_start_lambda,
+        self.lagrangian_convergence_tolerance,
+      }
+      if None in augmented_params:
         raise KeyError
-      if self.lagrangian_convergence_tolerance is None:
-        raise KeyError
+
+    # Set up directories
+    for directory in ('results', 'logs', 'checkpoints'):
+      (self.root_dir / directory).mkdir(parents=True, exist_ok=True)
+
+  @property
+  def log_dir(self):
+    return self.root_dir / 'logs'
+
+  @property
+  def checkpoint_dir(self):
+    return self.root_dir / 'checkpoints'
+  
+  @property
+  def results_dir(self):
+    return self.root_dir / 'results'
 
   def to_tensorboard_dict(self) -> dict:
     d = asdict(self)
-    d["model_type"] = d["model_type"].name
-    d["dataset_type"] = d["dataset_type"].name
-    d["optimizer_type"] = d["optimizer_type"].name
-    d["complexity_type"] = d["complexity_type"].name
-    d["lagrangian_type"] = d["lagrangian_type"].name
-    if d["complexity_lambda"] is None:
-      del d["complexity_lambda"]
-    if d["lagrangian_start_epoch"] is None:
-      del d["lagrangian_start_epoch"]
-    if d["lagrangian_target"] is None:
-      del d["lagrangian_target"]
-    if d["lagrangian_tolerance"] is None:
-      del d["lagrangian_tolerance"]
-    if d["lagrangian_start_mu"] is None:
-      del d["lagrangian_start_mu"]
-    if d["lagrangian_patience_batches"] is None:
-      del d["lagrangian_patience_batches"]
-    if d["lagrangian_improvement_rate"] is None:
-      del d["lagrangian_improvement_rate"]
-    if d["lagrangian_start_lambda"] is None:
-      del d["lagrangian_start_lambda"]
-    if d["lagrangian_convergence_tolerance"] is None:
-      del d["lagrangian_convergence_tolerance"]
-    del d["log_batch_freq"]
-    del d["save_epoch_freq"]
-    del d["data_dir"]
-    del d["log_dir"]
-    del d["checkpoint_dir"]
-    del d["resume_from_checkpoint"]
-    del d["verbosity"]
+    d = {x: y for (x,y) in d.items() if y is not None}
+    d = {x:(y.name if isinstance(y, Enum) else y) for x,y in d.items()}
 
     return d
+  
+  @property
+  def md5(self):
+    return hashlib.md5(str(self).encode('utf-8')).hexdigest()
 
 class EvaluationMetrics(NamedTuple):
   acc: float

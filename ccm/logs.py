@@ -7,10 +7,10 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 
-from experiment_config import (
+from .experiment_config import (
   ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics,
   LagrangianType, Verbosity)
-from lagrangian import Lagrangian
+from .lagrangian import Lagrangian
 
 
 class BaseLogger(object):

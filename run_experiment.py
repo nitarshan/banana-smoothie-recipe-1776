@@ -5,30 +5,15 @@ import time
 from typing import Optional, Tuple, List
 from collections import deque
 
-from logs import CometLogger, WandbLogger
 import fire
 import torch
 
-from experiment import Experiment
-from experiment_config import (
+from ccm.experiment import Experiment
+from ccm.experiment_config import (
   ComplexityType, DatasetType, EConfig, ETrainingState, LagrangianType,
   ModelType, OptimizerType, Verbosity)
+from ccm.logs import CometLogger, WandbLogger
 
-def setup_paths(root_dir: str, experiment_id: int, data_dir: Optional[str]) -> Tuple[Path, Path, Path, Path]:
-  print('[Experiment {}] Setting up directories'.format(experiment_id))
-  root_path = Path(root_dir)
-  results_path = root_path / 'results'
-  results_path.mkdir(parents=True, exist_ok=True)
-  log_path = root_path / 'logs'
-  if data_dir is None:
-    data_path = root_path / 'data'
-    data_path.mkdir(parents=True, exist_ok=True)
-  else:
-    data_path = Path(data_dir)
-  checkpoint_path = root_path / 'checkpoints'
-  checkpoint_path.mkdir(parents=True, exist_ok=True)
-  print('[Experiment {}] Results path {}'.format(experiment_id, results_path))
-  return results_path, log_path, data_path, checkpoint_path
 
 # Run a single
 def single(
@@ -62,7 +47,7 @@ def single(
   comet_tag: Optional[str] = None,
   logger: Optional[object] = None,
   log_epoch_freq: Optional[int] = 20,
-  save_epoch_freq: Optional[int] = None,
+  save_epoch_freq: Optional[int] = 1,
   seed: Optional[int] = None,
   data_seed: Optional[int] = None,
   data_dir: Optional[str] = None,
@@ -75,16 +60,22 @@ def single(
   print('[Experiment {}]'.format(experiment_id))
   print("[Experiment {}] CUDA devices:".format(experiment_id), torch.cuda.device_count())
 
-  results_path, log_path, data_path, checkpoint_path = setup_paths(root_dir, experiment_id, data_dir)
+  root_path = Path(root_dir)
+  if data_dir is None:
+    data_path = root_path / 'data'
+    data_path.mkdir(parents=True, exist_ok=True)
+  else:
+    data_path = Path(data_dir)
 
   if seed is None:
-    seed = experiment_id % (2**32)
+    seed = 0
   e_config = EConfig(
     seed=seed,
     data_seed=data_seed,
     use_cuda=use_cuda,
     model_type= ModelType[model_type],
-    model_shape=[model_width]*model_depth,
+    model_depth=model_depth,
+    model_width=model_width,
     dataset_type=DatasetType[dataset_type],
     batch_size=batch_size,
     optimizer_type=OptimizerType[optimizer_type],
@@ -108,9 +99,8 @@ def single(
     global_convergence_patience=global_convergence_patience,
     global_convergence_target=global_convergence_target,
     global_convergence_evaluation_freq_milestones=global_convergence_evaluation_freq_milestones,
-    log_dir=log_path,
+    root_dir=Path(root_dir),
     data_dir=data_path,
-    checkpoint_dir=checkpoint_path,
     verbosity=Verbosity.LAGRANGIAN,
     use_tqdm=use_tqdm,
     use_dataset_cross_entropy_stopping=use_dataset_cross_entropy_stopping,
@@ -129,7 +119,7 @@ def single(
       'final_results_val': val_eval,
       'final_results_train': train_eval,
     }
-    with open(results_path / '{}.epoch{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
+    with open(e_config.results_dir / '{}.epoch{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
       pickle.dump(results, results_file)
 
   print('[Experiment {}]'.format(experiment_id), e_config)
@@ -139,7 +129,7 @@ def single(
       logger = WandbLogger(comet_tag, e_config.to_tensorboard_dict())
     elif comet_api_key is not None:
       logger = CometLogger(comet_api_key, comet_tag, e_config.to_tensorboard_dict())
-  val_eval, train_eval = Experiment(e_state, device, e_config, logger, dump_results).train()
+  Experiment(e_state, device, e_config, logger, dump_results).train()
 
 if __name__ == '__main__':
   try:
