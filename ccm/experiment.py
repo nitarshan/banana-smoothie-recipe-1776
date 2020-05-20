@@ -22,7 +22,7 @@ class Experiment:
     self,
     e_state: ETrainingState,
     device: torch.device,
-    e_config: EConfig = None,
+    e_config: EConfig,
     logger: Optional[BaseLogger] = None,
     result_save_callback: Optional[object] = None
   ):
@@ -81,8 +81,7 @@ class Experiment:
     )
 
     # Load data
-    self.train_loader, self.train_eval_loader, self.val_loader, self.test_loader = \
-      get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device, self.cfg.data_seed)
+    self.train_loader, self.train_eval_loader, self.val_loader, self.test_loader = get_dataloaders(self.cfg, self.device)
 
     # Resume from checkpoint if available
     self.load_state()
@@ -219,11 +218,6 @@ class Experiment:
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
         self.printer.epoch_metrics(self.cfg, self.e_state, self.lagrangian.constraint_hist, epoch, train_eval, val_eval)
         self.result_save_callback(epoch, val_eval, train_eval)
-
-      # Save state
-      is_save_epoch = self.cfg.save_epoch_freq is not None and (epoch % self.cfg.save_epoch_freq == 0 or epoch==self.cfg.epochs or self.e_state.converged)
-      if is_save_epoch:
-        self.save_state()
 
       if self.e_state.converged:
         print('Converged')

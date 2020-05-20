@@ -113,7 +113,6 @@ class ETrainingState:
 @dataclass(frozen=True)
 class EConfig:
   seed: int = 0
-  data_seed: Optional[int] = None
   use_cuda: bool = True
   # Model
   model_type: ModelType = ModelType.NIN
@@ -121,6 +120,9 @@ class EConfig:
   model_width: int = 1
   # Dataset
   dataset_type: DatasetType = DatasetType.CIFAR10
+  data_seed: Optional[int] = None
+  train_dataset_size: Optional[int] = None
+  label_noise: Optional[float] = None
   # Training
   batch_size: int = 128
   epochs: int = 100

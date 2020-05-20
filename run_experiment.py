@@ -55,6 +55,8 @@ def single(
   use_tqdm: bool = False,
   use_dataset_cross_entropy_stopping: bool = False,
   base_width: int = 32,
+  train_dataset_size: Optional[int] = None,
+  label_noise: Optional[float] = None,
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
@@ -71,12 +73,14 @@ def single(
     seed = 0
   e_config = EConfig(
     seed=seed,
-    data_seed=data_seed,
     use_cuda=use_cuda,
     model_type= ModelType[model_type],
     model_depth=model_depth,
     model_width=model_width,
     dataset_type=DatasetType[dataset_type],
+    data_seed=data_seed,
+    train_dataset_size=train_dataset_size,
+    label_noise=label_noise,
     batch_size=batch_size,
     optimizer_type=OptimizerType[optimizer_type],
     lr=lr,
