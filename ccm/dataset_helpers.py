@@ -35,7 +35,7 @@ def bootstrap_indices(seed: int, length: int, count: Optional[int]) -> torch.Ten
   return indices
 
 def apply_label_noise(target: torch.Tensor, cfg: EConfig):
-  if cfg.label_noise is not None and cfg.label_noise > 0:
+  if cfg.label_noise is None or cfg.label_noise <= 0:
     return target
   mask = torch.rand_like(target) <= cfg.label_noise
   noise = torch.randint_like(target, cfg.dataset_type.K)
