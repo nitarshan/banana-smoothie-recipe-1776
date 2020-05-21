@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 import torch
@@ -26,23 +26,19 @@ def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, Dat
 
 
 def process_data(cfg: EConfig, data: torch.Tensor, targets: torch.Tensor, device: torch.device, train: bool):
+  # Resize training dataset
+  if train and (cfg.train_dataset_size is not None):
+    rng = np.random.RandomState(cfg.data_seed) if (cfg.data_seed is not None) else np.random
+    indices = rng.random.choice(len(data), cfg.train_dataset_size, replace=False)
+    indices = torch.from_numpy(indices)
+    data = torch.index_select(data, 0, indices)
+    targets = torch.index_select(targets, 0, indices)
+
   # Label noise
   if cfg.label_noise is not None:
     mask = torch.rand_like(targets) <= cfg.label_noise
     noise = torch.randint_like(targets, cfg.dataset_type.K)
     targets[mask] = noise[mask]
-
-  # Bootstrap sample
-  if train and cfg.data_seed is not None:
-    rng = np.random.RandomState(cfg.data_seed)
-    indices = torch.from_numpy(rng.randint(0, len(data), len(data) if cfg.train_dataset_size is None else cfg.train_dataset_size))
-    data = torch.index_select(data, 0, indices)
-    targets = torch.index_select(targets, 0, indices)
-  elif train and cfg.train_dataset_size is not None:
-    rng = np.random.RandomState(cfg.seed)
-    indices = torch.from_numpy(rng.choice(len(data), cfg.train_dataset_size, replace=False))
-    data = torch.index_select(data, 0, indices)
-    targets = torch.index_select(targets, 0, indices)
 
   # Put both data and targets on GPU in advance
   return data.to(device), targets.to(device)
