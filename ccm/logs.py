@@ -123,7 +123,7 @@ class CometLogger(BaseLogger):
 
 class WandbLogger(BaseLogger):
   def __init__(self, tag: Optional[str] = None, hps: Optional[dict] = None):
-    wandb.init(project='ccm', config=hps, tags=[tag])
+    wandb.init(project='rgm', config=hps, tags=[tag])
 
   def log_metrics(self, step: int, metrics: dict):
     wandb.log(metrics, step=step)
