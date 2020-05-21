@@ -95,7 +95,7 @@ class Experiment:
       'model': self.model.state_dict(),
       'optimizer': self.optimizer.state_dict(),
       'detector': self.detector,
-      'lagrangian': self.lagrangian,
+      # 'lagrangian': self.lagrangian,
       'np_rng': np.random.get_state(),
       'torch_rng': torch.get_rng_state(),
     }, checkpoint_file)
@@ -109,7 +109,7 @@ class Experiment:
         self.model.load_state_dict(checkpoint['model'])
         self.optimizer.load_state_dict(checkpoint['optimizer'])
         self.detector = checkpoint['detector']
-        self.lagrangian = checkpoint['lagrangian']
+        # self.lagrangian = checkpoint['lagrangian']
         np.random.set_state(checkpoint['np_rng'])
         torch.set_rng_state(checkpoint['torch_rng'])
       print(f'loading from checkpoint at epoch {self.e_state.epoch} global batch {self.e_state.global_batch}')
