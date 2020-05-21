@@ -197,6 +197,7 @@ class Experiment:
           self.e_state.converged = True
         else:
           while len(self.e_state.subepoch_ce_check_milestones) > 0 and dataset_ce <= self.e_state.subepoch_ce_check_milestones[0]:
+            print(f'passed ce milestone {self.e_state.subepoch_ce_check_milestones[0]}')
             self.e_state.subepoch_ce_check_milestones.pop(0)
             self.e_state.subepoch_ce_check_freq += 1
 
