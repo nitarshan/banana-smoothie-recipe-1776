@@ -22,7 +22,7 @@ class Experiment:
     self,
     e_state: ETrainingState,
     device: torch.device,
-    e_config: EConfig = None,
+    e_config: EConfig,
     logger: Optional[BaseLogger] = None,
     result_save_callback: Optional[object] = None
   ):
@@ -81,14 +81,13 @@ class Experiment:
     )
 
     # Load data
-    self.train_loader, self.train_eval_loader, self.val_loader, self.test_loader = \
-      get_dataloaders(self.cfg.dataset_type, self.cfg.data_dir, self.cfg.batch_size, self.device, self.cfg.data_seed)
+    self.train_loader, self.train_eval_loader, self.test_loader = get_dataloaders(self.cfg, self.device)
 
     # Resume from checkpoint if available
     self.load_state()
 
-  def save_state(self) -> None:
-    checkpoint_file = self.cfg.checkpoint_dir / (self.cfg.md5 + '.pt')
+  def save_state(self, postfix: str = '') -> None:
+    checkpoint_file = self.cfg.checkpoint_dir / (self.cfg.md5 + postfix + '.pt')
     torch.save({
       'config': self.cfg,
       'state': self.e_state,
@@ -197,8 +196,12 @@ class Experiment:
           self.e_state.converged = True
         else:
           while len(self.e_state.subepoch_ce_check_milestones) > 0 and dataset_ce <= self.e_state.subepoch_ce_check_milestones[0]:
+            passed_milestone = self.e_state.subepoch_ce_check_milestones[0]
+            print(f'passed ce milestone {passed_milestone}')
             self.e_state.subepoch_ce_check_milestones.pop(0)
             self.e_state.subepoch_ce_check_freq += 1
+            if self.cfg.save_epoch_freq is not None:
+              self.save_state(f'_ce_{passed_milestone}')
 
       if self.e_state.converged:
         break
@@ -215,7 +218,7 @@ class Experiment:
       is_evaluation_epoch = (epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0)
       if is_evaluation_epoch or self.e_state.converged:
         train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.cfg.epochs or self.e_state.converged))
-        val_eval = self.evaluate(DatasetSubsetType.VAL)
+        val_eval = self.evaluate(DatasetSubsetType.TEST)
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
         self.printer.epoch_metrics(self.cfg, self.e_state, self.lagrangian.constraint_hist, epoch, train_eval, val_eval)
         self.result_save_callback(epoch, val_eval, train_eval)
@@ -240,7 +243,7 @@ class Experiment:
   @torch.no_grad()
   def evaluate(self, dataset_subset_type: DatasetSubsetType, compute_all_measures: bool = False) -> EvaluationMetrics:
     self.model.eval()
-    data_loader = [self.train_eval_loader, self.val_loader, self.test_loader][dataset_subset_type]
+    data_loader = [self.train_eval_loader, self.test_loader][dataset_subset_type]
 
     cross_entropy_loss, acc, complexity, constraint_loss, num_correct = self.evaluate_cross_entropy(dataset_subset_type, True, False)
 
@@ -260,7 +263,7 @@ class Experiment:
     complexity = 0
     num_correct = 0
 
-    data_loader = [self.train_eval_loader, self.val_loader, self.test_loader][dataset_subset_type]
+    data_loader = [self.train_eval_loader, self.test_loader][dataset_subset_type]
     num_to_evaluate_on = len(data_loader.dataset)
 
     for data, target in data_loader:

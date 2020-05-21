@@ -1,67 +1,70 @@
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
 import torchvision as tv
 
-from .experiment_config import DatasetType
+from .experiment_config import EConfig, DatasetType
 
 
-def get_dataloaders(dataset_name: DatasetType, data_path: Path, batch_size: int, device: torch.device, seed: Optional[int] = None) -> Tuple[DataLoader, DataLoader, DataLoader, DataLoader]:
-  if dataset_name == DatasetType.MNIST:
-    train = MNIST(device, seed, data_path, train=True, download=True)
-    test = MNIST(device, None, data_path, train=False, download=True)
-  elif dataset_name == DatasetType.CIFAR10:
-    train = CIFAR10(device, seed, data_path, train=True, download=True)
-    test = CIFAR10(device, None, data_path, train=False, download=True)
+def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, DataLoader, DataLoader]:
+  if cfg.dataset_type == DatasetType.MNIST:
+    dataset = MNIST
+  elif cfg.dataset_type == DatasetType.CIFAR10:
+    dataset = CIFAR10
   else:
     raise KeyError
 
-  val_split = 0.15
-  validation_size = round(len(train) * val_split)
-  train, val = torch.utils.data.random_split(train, (len(train) - validation_size, validation_size))
+  train = dataset(cfg, device, train=True, download=True)
+  test = dataset(cfg, device, train=False, download=True)
 
-  train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=0)
+  train_loader = DataLoader(train, batch_size=cfg.batch_size, shuffle=True, num_workers=0)
   train_eval_loader = DataLoader(train, batch_size=5000, shuffle=False, num_workers=0)
-  val_loader = DataLoader(val, batch_size=5000, shuffle=False, num_workers=0)
   test_loader = DataLoader(test, batch_size=5000, shuffle=False, num_workers=0)
-  return train_loader, train_eval_loader, val_loader, test_loader
+  return train_loader, train_eval_loader, test_loader
 
-def bootstrap_indices(seed: int, length: int) -> torch.Tensor:
-  rng = np.random.RandomState(seed)
-  indices = torch.from_numpy(rng.randint(0, length, length))
-  return indices
+
+def process_data(cfg: EConfig, data: torch.Tensor, targets: torch.Tensor, device: torch.device, train: bool):
+  # Resize training dataset
+  if train and (cfg.train_dataset_size is not None):
+    rng = np.random.RandomState(cfg.data_seed) if (cfg.data_seed is not None) else np.random
+    indices = rng.choice(len(data), cfg.train_dataset_size, replace=False)
+    indices = torch.from_numpy(indices)
+    data = torch.index_select(data, 0, indices)
+    targets = torch.index_select(targets, 0, indices)
+
+  # Label noise
+  if cfg.label_noise is not None:
+    mask = torch.rand_like(targets) <= cfg.label_noise
+    noise = torch.randint_like(targets, cfg.dataset_type.K)
+    targets[mask] = noise[mask]
+
+  # Put both data and targets on GPU in advance
+  return data.to(device), targets.to(device)
+
 
 # https://gist.github.com/y0ast/f69966e308e549f013a92dc66debeeb4
 # We need to keep the class name the same as base class methods rely on it
 class MNIST(tv.datasets.MNIST):
-  def __init__(self, device: torch.device, seed: Optional[int], *args, **kwargs):
-    super().__init__(*args, **kwargs)
+  def __init__(self, cfg: EConfig, device: torch.device, *args, **kwargs):
+    super().__init__(cfg.data_dir, *args, **kwargs)
 
     # Scale data to [0,1]
     self.data = self.data.unsqueeze(1).float().div(255)
-    
+
     # Normalize it with the usual MNIST mean and std
     self.data = self.data.sub_(0.1307).div_(0.3081)
-    
-    # Put both data and targets on GPU in advance
-    self.data, self.targets = self.data.to(device), self.targets.to(device)
 
-    # Bootstrap sample
-    if seed is not None:
-      indices = bootstrap_indices(seed, len(self.data))
-      self.data = torch.index_select(self.data, 0, indices)
-      self.targets = torch.index_select(self.targets, 0, indices)
+    self.data, self.targets = process_data(cfg, self.data, self.targets, device, self.train)
 
   def __getitem__(self, index):
     return self.data[index], self.targets[index]
 
+
 class CIFAR10(tv.datasets.CIFAR10):
-  def __init__(self, device: torch.device, seed: Optional[int], *args, **kwargs):
-    super().__init__(*args, **kwargs)
+  def __init__(self, cfg: EConfig, device: torch.device, *args, **kwargs):
+    super().__init__(cfg.data_dir, *args, **kwargs)
 
     # Scale data to [0,1] floats
     self.data = self.data / 255
@@ -76,14 +79,7 @@ class CIFAR10(tv.datasets.CIFAR10):
     self.data = torch.tensor(self.data, dtype=torch.float32)
     self.targets = torch.tensor(self.targets, dtype=torch.long)
 
-    # Bootstrap sample
-    if seed is not None:
-      indices = bootstrap_indices(seed, len(self.data))
-      self.data = torch.index_select(self.data, 0, indices)
-      self.targets = torch.index_select(self.targets, 0, indices)
-    
-    # Put both data and targets on GPU in advance
-    self.data, self.targets = self.data.to(device), self.targets.to(device)
+    self.data, self.targets = process_data(cfg, self.data, self.targets, device, self.train)
 
   def __getitem__(self, index):
     return self.data[index], self.targets[index]
