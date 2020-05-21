@@ -36,7 +36,7 @@ if __name__=='__main__':
       'final_results_val': val_eval,
       'final_results_train': train_eval,
     }
-    with open(cfg.results_dir / '{}.epoch{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
+    with open(cfg.results_dir / '{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
       pickle.dump(results, results_file)
 
   Experiment(state, device, cfg, logger, dump_results).train()

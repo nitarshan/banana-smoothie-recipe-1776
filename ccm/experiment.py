@@ -221,6 +221,8 @@ class Experiment:
         val_eval = self.evaluate(DatasetSubsetType.TEST)
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
         self.printer.epoch_metrics(self.cfg, self.e_state, self.lagrangian.constraint_hist, epoch, train_eval, val_eval)
+      
+      if epoch==self.cfg.epochs or self.e_state.converged:
         self.result_save_callback(epoch, val_eval, train_eval)
 
       # Save state
