@@ -24,18 +24,29 @@ def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, Dat
   test_loader = DataLoader(test, batch_size=5000, shuffle=False, num_workers=0)
   return train_loader, train_eval_loader, test_loader
 
-def bootstrap_indices(seed: int, length: int, count: Optional[int]) -> torch.Tensor:
-  rng = np.random.RandomState(seed)
-  indices = torch.from_numpy(rng.randint(0, length, length if count is None else count))
-  return indices
 
-def apply_label_noise(target: torch.Tensor, cfg: EConfig):
-  if cfg.label_noise is None or cfg.label_noise <= 0:
-    return target
-  mask = torch.rand_like(target) <= cfg.label_noise
-  noise = torch.randint_like(target, cfg.dataset_type.K)
-  target[mask] = noise[mask]
-  return target
+def process_data(cfg: EConfig, data: torch.Tensor, targets: torch.Tensor, device: torch.device, train: bool):
+  # Label noise
+  if cfg.label_noise is not None:
+    mask = torch.rand_like(targets) <= cfg.label_noise
+    noise = torch.randint_like(targets, cfg.dataset_type.K)
+    targets[mask] = noise[mask]
+
+  # Bootstrap sample
+  if train and cfg.data_seed is not None:
+    rng = np.random.RandomState(cfg.data_seed)
+    indices = torch.from_numpy(rng.randint(0, len(data), len(data) if cfg.train_dataset_size is None else cfg.train_dataset_size))
+    data = torch.index_select(data, 0, indices)
+    targets = torch.index_select(targets, 0, indices)
+  elif train and cfg.train_dataset_size is not None:
+    rng = np.random.RandomState(cfg.seed)
+    indices = torch.from_numpy(rng.choice(len(data), cfg.train_dataset_size, replace=False))
+    data = torch.index_select(data, 0, indices)
+    targets = torch.index_select(targets, 0, indices)
+
+  # Put both data and targets on GPU in advance
+  return data.to(device), targets.to(device)
+
 
 # https://gist.github.com/y0ast/f69966e308e549f013a92dc66debeeb4
 # We need to keep the class name the same as base class methods rely on it
@@ -49,25 +60,11 @@ class MNIST(tv.datasets.MNIST):
     # Normalize it with the usual MNIST mean and std
     self.data = self.data.sub_(0.1307).div_(0.3081)
 
-    # Label noise
-    self.targets = apply_label_noise(self.targets, cfg)
-
-    # Bootstrap sample
-    if cfg.data_seed is not None:
-      indices = bootstrap_indices(cfg.data_seed, len(self.data), cfg.train_dataset_size)
-      self.data = torch.index_select(self.data, 0, indices)
-      self.targets = torch.index_select(self.targets, 0, indices)
-    elif cfg.train_dataset_size is not None:
-      rng = np.random.RandomState(cfg.seed)
-      indices = torch.from_numpy(rng.choice(len(self.data), cfg.train_dataset_size, replace=False))
-      self.data = torch.index_select(self.data, 0, indices)
-      self.targets = torch.index_select(self.targets, 0, indices)
-
-    # Put both data and targets on GPU in advance
-    self.data, self.targets = self.data.to(device), self.targets.to(device)
+    self.data, self.targets = process_data(cfg, self.data, self.targets, device, self.train)
 
   def __getitem__(self, index):
     return self.data[index], self.targets[index]
+
 
 class CIFAR10(tv.datasets.CIFAR10):
   def __init__(self, cfg: EConfig, device: torch.device, *args, **kwargs):
@@ -86,22 +83,7 @@ class CIFAR10(tv.datasets.CIFAR10):
     self.data = torch.tensor(self.data, dtype=torch.float32)
     self.targets = torch.tensor(self.targets, dtype=torch.long)
 
-    # Label noise
-    self.targets = apply_label_noise(self.targets, cfg)
-
-    # Bootstrap sample
-    if cfg.data_seed is not None:
-      indices = bootstrap_indices(cfg.data_seed, len(self.data), cfg.train_dataset_size)
-      self.data = torch.index_select(self.data, 0, indices)
-      self.targets = torch.index_select(self.targets, 0, indices)
-    elif cfg.train_dataset_size is not None:
-      rng = np.random.RandomState(cfg.seed)
-      indices = torch.from_numpy(rng.choice(len(self.data), cfg.train_dataset_size, replace=False))
-      self.data = torch.index_select(self.data, 0, indices)
-      self.targets = torch.index_select(self.targets, 0, indices)
-
-    # Put both data and targets on GPU in advance
-    self.data, self.targets = self.data.to(device), self.targets.to(device)
+    self.data, self.targets = process_data(cfg, self.data, self.targets, device, self.train)
 
   def __getitem__(self, index):
     return self.data[index], self.targets[index]
