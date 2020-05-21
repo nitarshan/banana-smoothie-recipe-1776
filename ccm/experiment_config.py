@@ -1,5 +1,5 @@
 from collections import deque
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import Enum, IntEnum
 import hashlib
 from pathlib import Path
@@ -100,14 +100,14 @@ class LagrangianType(Enum):
 
 @dataclass(frozen=False)
 class ETrainingState:
-  id: int
+  id: int = 0
   epoch: int = 1
   batch: int = 1
   global_batch: int = 1
   loss_hist: Deque[float] = deque([])
   converged: bool = False
   subepoch_ce_check_freq: int = 0
-  subepoch_ce_check_milestones: List[int] = None
+  subepoch_ce_check_milestones: Optional[List[float]] = None
 
 # Configuration for the experiment
 @dataclass(frozen=True)
@@ -117,43 +117,43 @@ class EConfig:
   use_cuda: bool = True
   # Model
   model_type: ModelType = ModelType.NIN
-  model_depth: int = 4
-  model_width: int = 1
+  model_depth: int = 2
+  model_width: int = 8
   # Dataset
   dataset_type: DatasetType = DatasetType.CIFAR10
   # Training
-  batch_size: int = 128
+  batch_size: int = 32
   epochs: int = 100
-  optimizer_type: OptimizerType = OptimizerType.SGD
-  lr: float = 0.001
+  optimizer_type: OptimizerType = OptimizerType.SGD_MOMENTUM
+  lr: float = 0.01
   complexity_type: ComplexityType = ComplexityType.NONE
   complexity_lambda: Optional[float] = None
   # Constrained Optimization
   lagrangian_type: LagrangianType = LagrangianType.NONE
-  lagrangian_start_epoch: Optional[int] = None
-  lagrangian_target: Optional[float] = None
-  lagrangian_tolerance: Optional[float] = None
-  lagrangian_start_mu: Optional[float] = None
-  lagrangian_patience_batches: Optional[int] = None
-  lagrangian_improvement_rate: Optional[float] = None
+  lagrangian_start_epoch: Optional[int] = 0
+  lagrangian_target: Optional[float] = 0
+  lagrangian_tolerance: Optional[float] = 0.1
+  lagrangian_start_mu: Optional[float] = 1e-6
+  lagrangian_patience_batches: Optional[int] = 200
+  lagrangian_improvement_rate: Optional[float] = 0.75
   ## Augmented Lagrangian Terms
-  lagrangian_start_lambda: Optional[float] = None
-  lagrangian_convergence_tolerance: Optional[float] = None
+  lagrangian_start_lambda: Optional[float] = 0
+  lagrangian_convergence_tolerance: Optional[float] = 1e-4
   # Global Convergence
-  global_convergence_method: Optional[str] = None
-  global_convergence_tolerance: Optional[float] = None
-  global_convergence_patience: Optional[int] = None
-  global_convergence_target: Optional[float] = None
-  global_convergence_evaluation_freq_milestones: Optional[List[float]] = None
+  global_convergence_method: Optional[str] = "leq"
+  global_convergence_tolerance: Optional[float] = 1e-6
+  global_convergence_patience: Optional[int] = 30
+  global_convergence_target: Optional[float] = 0.01
+  global_convergence_evaluation_freq_milestones: Optional[List[float]] = field(default_factory=lambda: [0.05, 0.025, 0.015])
   # Visibility (default no visibility)
-  log_batch_freq: Optional[int] = 100
-  log_epoch_freq: Optional[int] = 20
+  log_batch_freq: Optional[int] = None
+  log_epoch_freq: Optional[int] = 10
   save_epoch_freq: Optional[int] = 1
   root_dir: Path = Path('.')
   data_dir: Path = Path('data')
-  verbosity: Verbosity = Verbosity.NONE
+  verbosity: Verbosity = Verbosity.LAGRANGIAN
   use_tqdm: bool = False
-  use_dataset_cross_entropy_stopping: bool = False
+  use_dataset_cross_entropy_stopping: bool = True
   base_width: int = 32
 
   # Validation
