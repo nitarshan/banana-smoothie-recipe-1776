@@ -28,10 +28,4 @@ tar -xvzf $SLURM_TMPDIR/data/cifar-10-python.tar.gz -C $SLURM_TMPDIR/data/
 
 # 3. Launch your job
 echo "Launching Experiment"
-python run.py --root_dir=$SLURM_TMPDIR --data_dir=$SLURM_TMPDIR/data --id=1 "$@"
-
-# 4. Save experiment outputs
-mkdir -p ./checkpoints
-mkdir -p ./results
-cp -r $SLURM_TMPDIR/checkpoints/* checkpoints
-cp -r $SLURM_TMPDIR/results/* results
+python run.py --data_dir=$SLURM_TMPDIR/data --id=1 "$@"

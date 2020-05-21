@@ -86,8 +86,8 @@ class Experiment:
     # Resume from checkpoint if available
     self.load_state()
 
-  def save_state(self) -> None:
-    checkpoint_file = self.cfg.checkpoint_dir / (self.cfg.md5 + '.pt')
+  def save_state(self, postfix: str = '') -> None:
+    checkpoint_file = self.cfg.checkpoint_dir / (self.cfg.md5 + postfix + '.pt')
     torch.save({
       'config': self.cfg,
       'state': self.e_state,
@@ -196,9 +196,12 @@ class Experiment:
           self.e_state.converged = True
         else:
           while len(self.e_state.subepoch_ce_check_milestones) > 0 and dataset_ce <= self.e_state.subepoch_ce_check_milestones[0]:
-            print(f'passed ce milestone {self.e_state.subepoch_ce_check_milestones[0]}')
+            passed_milestone = self.e_state.subepoch_ce_check_milestones[0]
+            print(f'passed ce milestone {passed_milestone}')
             self.e_state.subepoch_ce_check_milestones.pop(0)
             self.e_state.subepoch_ce_check_freq += 1
+            if self.cfg.save_epoch_freq is not None:
+              self.save_state(f'_ce_{passed_milestone}')
 
       if self.e_state.converged:
         break
@@ -219,6 +222,11 @@ class Experiment:
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
         self.printer.epoch_metrics(self.cfg, self.e_state, self.lagrangian.constraint_hist, epoch, train_eval, val_eval)
         self.result_save_callback(epoch, val_eval, train_eval)
+
+      # Save state
+      is_save_epoch = self.cfg.save_epoch_freq is not None and (epoch % self.cfg.save_epoch_freq == 0 or epoch==self.cfg.epochs or self.e_state.converged)
+      if is_save_epoch:
+        self.save_state()
 
       if self.e_state.converged:
         print('Converged')

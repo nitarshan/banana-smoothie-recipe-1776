@@ -29,7 +29,7 @@ def process_data(cfg: EConfig, data: torch.Tensor, targets: torch.Tensor, device
   # Resize training dataset
   if train and (cfg.train_dataset_size is not None):
     rng = np.random.RandomState(cfg.data_seed) if (cfg.data_seed is not None) else np.random
-    indices = rng.random.choice(len(data), cfg.train_dataset_size, replace=False)
+    indices = rng.choice(len(data), cfg.train_dataset_size, replace=False)
     indices = torch.from_numpy(indices)
     data = torch.index_select(data, 0, indices)
     targets = torch.index_select(targets, 0, indices)
