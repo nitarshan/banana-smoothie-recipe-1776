@@ -8,7 +8,7 @@ import torchvision as tv
 from .experiment_config import EConfig, DatasetType
 
 
-def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, DataLoader, DataLoader, DataLoader]:
+def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, DataLoader, DataLoader]:
   if cfg.dataset_type == DatasetType.MNIST:
     dataset = MNIST
   elif cfg.dataset_type == DatasetType.CIFAR10:
@@ -19,15 +19,10 @@ def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, Dat
   train = dataset(cfg, device, train=True, download=True)
   test = dataset(cfg, device, train=False, download=True)
 
-  val_split = 0.15
-  validation_size = round(len(train) * val_split)
-  train, val = torch.utils.data.random_split(train, (len(train) - validation_size, validation_size))
-
   train_loader = DataLoader(train, batch_size=cfg.batch_size, shuffle=True, num_workers=0)
   train_eval_loader = DataLoader(train, batch_size=5000, shuffle=False, num_workers=0)
-  val_loader = DataLoader(val, batch_size=5000, shuffle=False, num_workers=0)
   test_loader = DataLoader(test, batch_size=5000, shuffle=False, num_workers=0)
-  return train_loader, train_eval_loader, val_loader, test_loader
+  return train_loader, train_eval_loader, test_loader
 
 def bootstrap_indices(seed: int, length: int, count: Optional[int]) -> torch.Tensor:
   rng = np.random.RandomState(seed)

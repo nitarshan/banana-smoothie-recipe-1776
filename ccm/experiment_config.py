@@ -17,8 +17,7 @@ class DatasetType(Enum):
 
 class DatasetSubsetType(IntEnum):
   TRAIN = 0
-  VAL = 1
-  TEST = 2
+  TEST = 1
 
 class ModelType(Enum):
   DEEP = 1
