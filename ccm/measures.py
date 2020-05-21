@@ -304,8 +304,8 @@ def get_all_measures(
   measures = {}
 
   model = deepcopy(model)
-  model = reparam(model)
-  init_model = reparam(init_model)
+  reparam(model)
+  reparam(init_model)
 
   device = next(model.parameters()).device
   weights_only = get_weights_only(model)
