@@ -2,9 +2,9 @@
 #SBATCH --partition=long
 #SBATCH --job-name=ccm
 #SBATCH --cpus-per-task=4
-#SBATCH --gres=gpu:rtx8000:1
+#SBATCH --gres=gpu:12gb:1
 #SBATCH --mem=12G
-#SBATCH --time=2:00:00
+#SBATCH --time=0:45:00
 
 # 1. Load your environment
 echo 'Load Environment'

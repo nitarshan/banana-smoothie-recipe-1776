@@ -119,12 +119,12 @@ class EConfig:
   model_width: int = 8
   # Dataset
   dataset_type: DatasetType = DatasetType.CIFAR10
-  data_seed: Optional[int] = None
+  data_seed: Optional[int] = 42
   train_dataset_size: Optional[int] = None
   label_noise: Optional[float] = None
   # Training
   batch_size: int = 32
-  epochs: int = 100
+  epochs: int = 300
   optimizer_type: OptimizerType = OptimizerType.SGD_MOMENTUM
   lr: float = 0.01
   complexity_type: ComplexityType = ComplexityType.NONE
@@ -155,7 +155,7 @@ class EConfig:
   verbosity: Verbosity = Verbosity.LAGRANGIAN
   use_tqdm: bool = False
   use_dataset_cross_entropy_stopping: bool = True
-  base_width: int = 32
+  base_width: int = 25
 
   # Validation
   def __post_init__(self):
