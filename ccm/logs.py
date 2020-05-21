@@ -169,6 +169,6 @@ class Printer(object):
           train_eval.avg_loss - val_eval.avg_loss, 100. * (train_eval.acc - val_eval.acc),
           np.mean(state.loss_hist), np.mean(constraint_hist),
           train_eval.complexity, train_eval.complexity - cfg.lagrangian_target, cfg.lagrangian_target * cfg.lagrangian_tolerance,
-          DatasetSubsetType.VAL.name, val_eval.avg_loss, 100. * val_eval.acc,
+          DatasetSubsetType.TEST.name, val_eval.avg_loss, 100. * val_eval.acc,
           DatasetSubsetType.TRAIN.name, train_eval.avg_loss, 100. * train_eval.acc,
           train_eval.complexity_loss))

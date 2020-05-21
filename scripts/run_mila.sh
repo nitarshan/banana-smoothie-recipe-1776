@@ -2,7 +2,7 @@
 #SBATCH --partition=long
 #SBATCH --job-name=ccm
 #SBATCH --cpus-per-task=4
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:rtx8000:1
 #SBATCH --mem=12G
 #SBATCH --time=2:00:00
 
@@ -31,7 +31,7 @@ echo "Launching Experiment"
 python run.py --root_dir=$SLURM_TMPDIR --data_dir=$SLURM_TMPDIR/data --id=1 "$@"
 
 # 4. Save experiment outputs
-mkdir ./checkpoints
-mkdir ./results
+mkdir -p ./checkpoints
+mkdir -p ./results
 cp -r $SLURM_TMPDIR/checkpoints/* checkpoints
 cp -r $SLURM_TMPDIR/results/* results
