@@ -13,6 +13,24 @@ from .models import ExperimentBaseModel
 def get_weights_only(model: ExperimentBaseModel) -> List[torch.Tensor]:
   return [p.view(p.shape[0],-1) for name, p in model.named_parameters() if 'bias' not in name and 'downsample.1' not in name]
 
+# https://github.com/bneyshabur/generalization-bounds/blob/master/measures.py
+@torch.no_grad()
+def reparam(model, prev_layer=None):
+  for child in model.children():
+    prev_layer = reparam(child, prev_layer)
+    if child._get_name() == 'Conv2d':
+      prev_layer = child
+    elif child._get_name() == 'BatchNorm2d':
+      scale = child.weight / ((child.running_var + child.eps).sqrt())
+      prev_layer.bias.copy_( child.bias  + ( scale * (prev_layer.bias - child.running_mean) ) )
+      perm = list(reversed(range(prev_layer.weight.dim())))
+      prev_layer.weight.copy_((prev_layer.weight.permute(perm) * scale ).permute(perm))
+      child.bias.fill_(0)
+      child.weight.fill_(1)
+      child.running_mean.fill_(0)
+      child.running_var.fill_(1)
+  return prev_layer
+
 def get_flat_params(weights_only: List[torch.Tensor]) -> torch.Tensor:
   return torch.cat([p.view(-1) for p in weights_only], dim=0)
 
@@ -276,6 +294,7 @@ def get_single_measure(
     
   raise KeyError
 
+@torch.no_grad()
 def get_all_measures(
   model: ExperimentBaseModel,
   init_model: ExperimentBaseModel,
@@ -284,13 +303,16 @@ def get_all_measures(
 ) -> Dict[CT, float]:
   measures = {}
 
+  model = deepcopy(model)
+  model = reparam(model)
+  init_model = reparam(init_model)
+
   device = next(model.parameters()).device
   weights_only = get_weights_only(model)
   init_weights_only = get_weights_only(init_model)
   
   d = len(weights_only)
 
-  measures[CT.NONE] = torch.zeros((1,), device=device)
   measures[CT.L2] = _l2_norm(weights_only)
   measures[CT.L2_DIST] = _l2_dist(weights_only, init_weights_only)
   measures[CT.LOG_PROD_OF_FRO] = _log_prod_of_fro(weights_only)
