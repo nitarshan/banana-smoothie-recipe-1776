@@ -28,7 +28,7 @@ if __name__=='__main__':
 
   # Run experiment
   device = torch.device('cuda' if cfg.use_cuda else 'cpu')
-  logger = WandbLogger('default', cfg.to_tensorboard_dict())
+  logger = WandbLogger('default', cfg.to_tensorboard_dict(), cfg.wandb_md5)
   def dump_results(epoch, val_eval, train_eval):
     results = {
       'e_state': state,

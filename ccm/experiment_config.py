@@ -204,6 +204,13 @@ class EConfig:
   @property
   def md5(self):
     return hashlib.md5(str(self).encode('utf-8')).hexdigest()
+  
+  @property
+  def wandb_md5(self):
+    dictionary = self.to_tensorboard_dict()
+    dictionary['seed'] = 0
+    return hashlib.md5(str(dictionary).encode('utf-8')).hexdigest()
+
 
 class EvaluationMetrics(NamedTuple):
   acc: float
