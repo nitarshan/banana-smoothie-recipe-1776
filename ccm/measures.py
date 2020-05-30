@@ -217,7 +217,7 @@ def get_single_measure(
   elif measure_type == CT.LOG_PROD_OF_FRO:
     return _log_prod_of_fro(weights_only)
   elif measure_type == CT.LOG_SUM_OF_FRO:
-    return d + (1/d) * _log_prod_of_fro(weights_only)
+    return np.log(d) + (1/d) * _log_prod_of_fro(weights_only)
   elif measure_type == CT.PARAM_NORM:
     return _param_norm(weights_only)
   elif measure_type == CT.PATH_NORM and intervention_mode == False:
@@ -229,7 +229,7 @@ def get_single_measure(
   elif measure_type == CT.LOG_PROD_OF_SPEC:
     return _log_spec_norm(weights_only)
   elif measure_type == CT.LOG_SUM_OF_SPEC:
-    return d + (1/d) * _log_spec_norm(weights_only)
+    return np.log(d) + (1/d) * _log_spec_norm(weights_only)
   elif measure_type == CT.FRO_DIST:
     return _fro_dist(weights_only, init_weights_only)
   elif measure_type == CT.FRO_OVER_SPEC:
@@ -280,11 +280,11 @@ def get_single_measure(
     elif measure_type == CT.LOG_PROD_OF_FRO_OVER_MARGIN:
       return _log_prod_of_fro(weights_only) -  2 * margin.log()
     elif measure_type == CT.LOG_SUM_OF_FRO_OVER_MARGIN:
-      return d + (1/d) * (_log_prod_of_fro(weights_only) -  2 * margin.log())
+      return np.log(d) + (1/d) * (_log_prod_of_fro(weights_only) -  2 * margin.log())
     elif measure_type == CT.LOG_PROD_OF_SPEC_OVER_MARGIN:
       return _log_spec_norm(weights_only) -  2 * margin.log()
     elif measure_type == CT.LOG_SUM_OF_SPEC_OVER_MARGIN:
-      return d + (1/d) * (_log_spec_norm(weights_only) -  2 * margin.log())
+      return np.log(d) + (1/d) * (_log_spec_norm(weights_only) -  2 * margin.log())
     elif measure_type == CT.PATH_NORM_OVER_MARGIN and intervention_mode == False:
       return _path_norm_observ(model) / margin ** 2
     elif measure_type == CT.PATH_NORM_OVER_MARGIN and intervention_mode == True:
@@ -299,13 +299,15 @@ def get_all_measures(
   model: ExperimentBaseModel,
   init_model: ExperimentBaseModel,
   dataloader: Optional[DataLoader] = None,
-  acc: Optional[float] = None
+  acc: Optional[float] = None,
+  use_reparam: bool = True,
 ) -> Dict[CT, float]:
   measures = {}
 
   model = deepcopy(model)
-  reparam(model)
-  reparam(init_model)
+  if use_reparam:
+    reparam(model)
+    reparam(init_model)
 
   device = next(model.parameters()).device
   weights_only = get_weights_only(model)
@@ -316,12 +318,12 @@ def get_all_measures(
   measures[CT.L2] = _l2_norm(weights_only)
   measures[CT.L2_DIST] = _l2_dist(weights_only, init_weights_only)
   measures[CT.LOG_PROD_OF_FRO] = _log_prod_of_fro(weights_only)
-  measures[CT.LOG_SUM_OF_FRO] = d + (1/d) * measures[CT.LOG_PROD_OF_FRO]
+  measures[CT.LOG_SUM_OF_FRO] = np.log(d) + (1/d) * measures[CT.LOG_PROD_OF_FRO]
   measures[CT.PARAM_NORM] = _param_norm(weights_only)
   measures[CT.PATH_NORM] = _path_norm_observ(model)
   measures[CT.PARAMS] = torch.tensor(_param_count(model))
   measures[CT.LOG_PROD_OF_SPEC] = _log_spec_norm(weights_only)
-  measures[CT.LOG_SUM_OF_SPEC] = d + (1/d) * measures[CT.LOG_PROD_OF_SPEC]
+  measures[CT.LOG_SUM_OF_SPEC] = np.log(d) + (1/d) * measures[CT.LOG_PROD_OF_SPEC]
   measures[CT.FRO_DIST] = _fro_dist(weights_only, init_weights_only)
   measures[CT.FRO_OVER_SPEC] = _fro_over_spec(weights_only, init_weights_only)
   measures[CT.DIST_SPEC_INIT] = _spec_dist(weights_only, init_weights_only)
@@ -349,9 +351,9 @@ def get_all_measures(
     margin = _margin(model, dataloader)
     measures[CT.INVERSE_MARGIN] = torch.tensor(1).to(device) / margin ** 2
     measures[CT.LOG_PROD_OF_FRO_OVER_MARGIN] = measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log()
-    measures[CT.LOG_SUM_OF_FRO_OVER_MARGIN] = d + (1/d) * (measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log())
+    measures[CT.LOG_SUM_OF_FRO_OVER_MARGIN] = np.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log())
     measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN] = measures[CT.LOG_PROD_OF_SPEC] - 2 * margin.log()
-    measures[CT.LOG_SUM_OF_SPEC_OVER_MARGIN] = d + (1/d) * (measures[CT.LOG_PROD_OF_SPEC] -  2 * margin.log())
+    measures[CT.LOG_SUM_OF_SPEC_OVER_MARGIN] = np.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_SPEC] -  2 * margin.log())
     measures[CT.PATH_NORM_OVER_MARGIN] = _path_norm_observ(model) / margin ** 2
 
   measures = {k: v.item() for k, v in measures.items()}
