@@ -57,6 +57,7 @@ def single(
   base_width: int = 32,
   train_dataset_size: Optional[int] = None,
   label_noise: Optional[float] = None,
+  test_dataset_size: Optional[int] = None,
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
@@ -80,6 +81,7 @@ def single(
     dataset_type=DatasetType[dataset_type],
     data_seed=data_seed,
     train_dataset_size=train_dataset_size,
+    test_dataset_size=test_dataset_size,
     label_noise=label_noise,
     batch_size=batch_size,
     optimizer_type=OptimizerType[optimizer_type],

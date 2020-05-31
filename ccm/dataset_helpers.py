@@ -32,10 +32,12 @@ def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, Dat
 
 
 def process_data(cfg: EConfig, data: torch.Tensor, targets: torch.Tensor, device: torch.device, train: bool):
-  # Resize training dataset
-  if train and (cfg.train_dataset_size is not None):
-    rng = np.random.RandomState(cfg.data_seed) if (cfg.data_seed is not None) else np.random
-    indices = rng.choice(len(data), cfg.train_dataset_size, replace=False)
+  # Resize dataset
+  dataset_size = cfg.train_dataset_size if train else cfg.test_dataset_size
+  offset = 0 if train else 1
+  if dataset_size is not None:
+    rng = np.random.RandomState(cfg.data_seed + offset) if (cfg.data_seed is not None) else np.random
+    indices = rng.choice(len(data), dataset_size, replace=False)
     indices = torch.from_numpy(indices)
     data = torch.index_select(data, 0, indices)
     targets = torch.index_select(targets, 0, indices)

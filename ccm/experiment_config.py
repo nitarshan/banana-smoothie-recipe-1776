@@ -122,6 +122,7 @@ class EConfig:
   dataset_type: DatasetType = DatasetType.CIFAR10
   data_seed: Optional[int] = 42
   train_dataset_size: Optional[int] = None
+  test_dataset_size: Optional[int] = None
   label_noise: Optional[float] = None
   # Training
   batch_size: int = 32
