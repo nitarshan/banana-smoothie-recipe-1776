@@ -108,7 +108,7 @@ class NiN(ExperimentBaseModel):
     self.relu = nn.ReLU(inplace=True)
 
     self.conv = nn.Conv2d(self.base_width*width, self.dataset_type.K, kernel_size=1, stride=1)
-    self.bn = nn.BatchNorm2d(10)
+    self.bn = nn.BatchNorm2d(self.dataset_type.K)
 
     self.avgpool = nn.AdaptiveAvgPool2d((1,1))
 

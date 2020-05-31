@@ -10,10 +10,11 @@ class DatasetType(Enum):
   MNIST = (1, (1, 28, 28), 10)
   CIFAR10 = (2, (3, 32, 32), 10)
   CIFAR100 = (3, (3, 32, 32), 100)
+  SVHN = (4, (3, 32, 32), 10)
   
-  def __init__(self, id, D, K):
-    self.D = D
-    self.K = K
+  def __init__(self, id, image_shape, num_classes):
+    self.D = image_shape
+    self.K = num_classes
 
 class DatasetSubsetType(IntEnum):
   TRAIN = 0

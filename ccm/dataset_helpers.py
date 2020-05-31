@@ -13,11 +13,17 @@ def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, Dat
     dataset = MNIST
   elif cfg.dataset_type == DatasetType.CIFAR10:
     dataset = CIFAR10
+  elif cfg.dataset_type == DatasetType.CIFAR100:
+    dataset = CIFAR100
+  elif cfg.dataset_type == DatasetType.SVHN:
+    dataset = SVHN
   else:
     raise KeyError
 
-  train = dataset(cfg, device, train=True, download=True)
-  test = dataset(cfg, device, train=False, download=True)
+  train_key = {'split': 'train'} if cfg.dataset_type == DatasetType.SVHN else {'train': True}
+  test_key = {'split': 'test'} if cfg.dataset_type == DatasetType.SVHN else {'train': False}
+  train = dataset(cfg, device, download=True, **train_key)
+  test = dataset(cfg, device, download=True, **test_key)
 
   train_loader = DataLoader(train, batch_size=cfg.batch_size, shuffle=True, num_workers=0)
   train_eval_loader = DataLoader(train, batch_size=5000, shuffle=False, num_workers=0)
@@ -83,3 +89,52 @@ class CIFAR10(tv.datasets.CIFAR10):
 
   def __getitem__(self, index):
     return self.data[index], self.targets[index]
+
+
+class CIFAR100(tv.datasets.CIFAR100):
+  def __init__(self, cfg: EConfig, device: torch.device, *args, **kwargs):
+    super().__init__(cfg.data_dir, *args, **kwargs)
+
+    # Scale data to [0,1] floats
+    self.data = self.data / 255
+
+    # Normalize data
+    self.data = (self.data - self.data.mean(axis=(0,1,2))) / self.data.std(axis=(0,1,2))
+
+    # NHWC -> NCHW
+    self.data = self.data.transpose((0, 3, 1, 2))
+
+    # Numpy -> Torch
+    self.data = torch.tensor(self.data, dtype=torch.float32)
+    self.targets = torch.tensor(self.targets, dtype=torch.long)
+
+    self.data, self.targets = process_data(cfg, self.data, self.targets, device, self.train)
+
+  def __getitem__(self, index):
+    return self.data[index], self.targets[index]
+
+
+class SVHN(tv.datasets.SVHN):
+  def __init__(self, cfg: EConfig, device: torch.device, *args, **kwargs):
+    super().__init__(cfg.data_dir, *args, **kwargs)
+
+    # Scale data to [0,1] floats
+    self.data = self.data / 255
+
+    # NCHWC -> NHWC (SVHN)
+    self.data = self.data.transpose((0, 2, 3, 1))
+
+    # Normalize data
+    self.data = (self.data - self.data.mean(axis=(0,1,2))) / self.data.std(axis=(0,1,2))
+
+    # NHWC -> NCHW
+    self.data = self.data.transpose((0, 3, 1, 2))
+
+    # Numpy -> Torch
+    self.data = torch.tensor(self.data, dtype=torch.float32)
+    self.labels = torch.tensor(self.labels, dtype=torch.long)
+
+    self.data, self.labels = process_data(cfg, self.data, self.labels, device, self.split == 'train')
+
+  def __getitem__(self, index):
+    return self.data[index], self.labels[index]
