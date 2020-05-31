@@ -1,10 +1,16 @@
 import time
 from typing import Dict, Optional
 
-from comet_ml import Experiment as CometExperiment
+try:
+  from comet_ml import Experiment as CometExperiment
+except:
+  pass
 import numpy as np
 import torch
-from torch.utils.tensorboard import SummaryWriter
+try:
+  from torch.utils.tensorboard import SummaryWriter
+except:
+  pass
 import wandb
 
 from .experiment_config import (
