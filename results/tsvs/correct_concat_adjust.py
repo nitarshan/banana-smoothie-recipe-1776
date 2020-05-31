@@ -17,7 +17,7 @@ pd.concat(dfs).to_csv(f'./results/tsvs/nin_cifar10_corrected.tsv', sep='\t', flo
 
 # Adjust measures accounting for dataset size
 df = pd.read_csv('./results/tsvs/nin_cifar10_corrected.tsv', sep='\t', index_col=0)
-adjust1 = [col for col in df.columns if col.startswith('complexity.') and 'pacbayes' not in col and 'params' not in col and 'inverse_margin' not in col]
+adjust1 = [col for col in df.columns if col.startswith('complexity.') and 'params' not in col and 'inverse_margin' not in col]
 adjust2 = [col for col in df.columns if col.startswith('complexity.') and 'path_norm' in col]
 adjust1_new = [x+'_adjusted1' for x in adjust1]
 adjust2_new = [x+'_adjusted2' for x in adjust2]
