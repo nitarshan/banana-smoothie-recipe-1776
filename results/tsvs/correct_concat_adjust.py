@@ -31,7 +31,7 @@ def preprocess(dataset):
   df = pd.concat(df)
   if dataset == 'cifar10':
     df = correct_sum_norms(df)
-  df['hp.dataset'] = 'CIFAR10'
+  df['hp.dataset'] = dataset
   df = adjust_measures(df)
   df['hp.train_dataset_size'] = df['train_dataset_size']
   df['complexity.log_spec_orig_main'] = df['complexity.log_prod_of_spec_over_margin'] + np.log(df['complexity.fro_over_spec'])
