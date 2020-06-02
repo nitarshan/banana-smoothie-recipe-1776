@@ -24,32 +24,35 @@ def adjust_measures(df):
 
   return df
 
-
-# CIFAR-10
-df1 = []
-for dataset_size in [6_250, 12_500, 25_000, 50_000]:
-  df1.append(pd.read_csv(f'./results/tsvs/nin_cifar10.{dataset_size}.tsv', sep='\t', index_col=0))
-df1 = pd.concat(df1)
-df1 = correct_sum_norms(df1)
-df1['hp.dataset'] = 'CIFAR10'
-
-# SVHN
-df2 = []
-for dataset_size in [6_250, 12_500, 25_000, 50_000]:
-  df2.append(pd.read_csv(f'./results/tsvs/nin_svhn.{dataset_size}.tsv', sep='\t', index_col=0))
-df2 =  pd.concat(df2)
-df2['hp.dataset'] = 'SVHN'
+def preprocess(dataset):
+  df = []
+  for dataset_size in [6_250, 12_500, 25_000, 50_000]:
+    df.append(pd.read_csv(f'./results/tsvs/nin_{dataset}.{dataset_size}.tsv', sep='\t', index_col=0))
+  df = pd.concat(df)
+  if dataset == 'cifar10':
+    df = correct_sum_norms(df)
+  df['hp.dataset'] = 'CIFAR10'
+  df = adjust_measures(df)
+  df['hp.train_dataset_size'] = df['train_dataset_size']
+  df['complexity.log_spec_orig_main'] = df['complexity.log_prod_of_spec_over_margin'] + np.log(df['complexity.fro_over_spec'])
+  return df
 
 # SVHN + CIFAR-10
+df1 = preprocess('cifar10')
+df2 = preprocess('svhn')
 df3 = pd.concat([df1, df2])
-df2 = adjust_measures(df2)
-df3['hp.train_dataset_size'] = df3['train_dataset_size']
-df3['complexity.log_spec_orig_main'] = df3['complexity.log_prod_of_spec_over_margin'] + np.log(df3['complexity.fro_over_spec'])
 
 # Save to CSVs
+df1.to_csv(f'./results/tsvs/nin_cifar_adjusted.csv', float_format="%.4g")
+df2.to_csv(f'./results/tsvs/nin_svhn_adjusted.csv', float_format="%.4g")
 df3.to_csv(f'./results/tsvs/nin_adjusted.csv', float_format="%.4g")
 
-df3 = pd.read_csv(f'./results/tsvs/nin_adjusted.csv')
-assert(len(df3['hp.lr'].unique())==5)
-assert(len(df3['hp.model_depth'].unique())==5)
-assert(len(df3['hp.model_width'].unique())==5)
+# Test CSVs
+def test_num_envs(df):
+  assert(len(df['hp.lr'].unique())==5)
+  assert(len(df['hp.model_depth'].unique())==5)
+  assert(len(df['hp.model_width'].unique())==5)
+
+test_num_envs(pd.read_csv(f'./results/tsvs/nin_cifar_adjusted.csv'))
+test_num_envs(pd.read_csv(f'./results/tsvs/nin_svhn_adjusted.csv'))
+test_num_envs(pd.read_csv(f'./results/tsvs/nin_adjusted.csv'))
