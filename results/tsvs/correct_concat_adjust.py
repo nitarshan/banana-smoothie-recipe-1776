@@ -35,6 +35,7 @@ def preprocess(dataset):
   df = adjust_measures(df)
   df['hp.train_dataset_size'] = df['train_dataset_size']
   df['complexity.log_spec_orig_main'] = df['complexity.log_prod_of_spec_over_margin'] + np.log(df['complexity.fro_over_spec'])
+  df['complexity.log_spec_orig_main_adjusted1'] = 0.5 * (df['complexity.log_spec_orig_main'] - np.log(df['train_dataset_size']))
   return df
 
 # SVHN + CIFAR-10
