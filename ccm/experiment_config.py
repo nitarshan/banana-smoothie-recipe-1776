@@ -120,7 +120,6 @@ class EConfig:
   epochs: int = 300
   optimizer_type: OptimizerType = OptimizerType.SGD_MOMENTUM
   lr: float = 0.01
-  complexity_type: ComplexityType = ComplexityType.NONE
   # Global Convergence
   global_convergence_target: Optional[float] = 0.01
   global_convergence_evaluation_freq_milestones: Optional[List[float]] = field(default_factory=lambda: [0.05, 0.025, 0.015])
@@ -174,7 +173,6 @@ class EConfig:
 class EvaluationMetrics(NamedTuple):
   acc: float
   avg_loss: float
-  complexity: float
   num_correct: int
   num_to_evaluate_on: int
   all_complexities: Dict[ComplexityType, float]

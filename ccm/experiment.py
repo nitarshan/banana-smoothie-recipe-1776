@@ -8,10 +8,9 @@ import torch.nn.functional as F
 from tqdm import trange
 
 from .dataset_helpers import get_dataloaders
-from .experiment_config import (
-  ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, OptimizerType)
+from .experiment_config import DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, OptimizerType
 from .logs import BaseLogger, Printer
-from .measures import get_all_measures, get_single_measure
+from .measures import get_all_measures
 from .models import get_model_for_config
 
 
@@ -105,34 +104,19 @@ class Experiment:
       self.model.train()
       self.optimizer.zero_grad()
       
-      if self.cfg.complexity_type in {ComplexityType.PATH_NORM, ComplexityType.PATH_NORM_OVER_MARGIN}:
-        orig_model = deepcopy(self.model)
-
       logits = self.model(data)
       cross_entropy = F.cross_entropy(logits, target)
 
       cross_entropy.backward()
       loss = cross_entropy.clone()
-
-      if self.cfg.complexity_type in {ComplexityType.PATH_NORM, ComplexityType.PATH_NORM_OVER_MARGIN}:
-        for param in self.model.parameters():
-          if param.requires_grad:
-            param.data.pow_(2)
-
-      complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type, intervention_mode=True)
       
       self.model.train()
-
-      if self.cfg.complexity_type in {ComplexityType.PATH_NORM, ComplexityType.PATH_NORM_OVER_MARGIN}:
-        for param, orig_param in zip(self.model.parameters(), orig_model.parameters()):
-          if param.requires_grad:
-            param.data = orig_param.data
 
       self.optimizer.step()
 
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
-      self.logger.log_batch_end(self.cfg, self.e_state, cross_entropy, complexity, loss)
+      self.logger.log_batch_end(self.cfg, self.e_state, cross_entropy, loss)
 
       # Cross-entropy stopping check
       if self.cfg.use_dataset_cross_entropy_stopping and batch_idx == ce_check_batches[0]:
@@ -166,7 +150,7 @@ class Experiment:
       if is_evaluation_epoch or self.e_state.converged:
         train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.cfg.epochs or self.e_state.converged))
         val_eval = self.evaluate(DatasetSubsetType.TEST)
-        self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
+        self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.all_complexities)
         self.printer.epoch_metrics(self.cfg, self.e_state, epoch, train_eval, val_eval)
       
       if epoch==self.cfg.epochs or self.e_state.converged:
@@ -192,7 +176,7 @@ class Experiment:
     self.model.eval()
     data_loader = [self.train_eval_loader, self.test_loader][dataset_subset_type]
 
-    cross_entropy_loss, acc, complexity, num_correct = self.evaluate_cross_entropy(dataset_subset_type, True, False)
+    cross_entropy_loss, acc, num_correct = self.evaluate_cross_entropy(dataset_subset_type)
 
     all_complexities = {}
     if dataset_subset_type == DatasetSubsetType.TRAIN and compute_all_measures:
@@ -200,13 +184,12 @@ class Experiment:
 
     self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
 
-    return EvaluationMetrics(acc, cross_entropy_loss, complexity, num_correct, len(data_loader.dataset), all_complexities)
+    return EvaluationMetrics(acc, cross_entropy_loss, num_correct, len(data_loader.dataset), all_complexities)
 
   @torch.no_grad()
-  def evaluate_cross_entropy(self, dataset_subset_type: DatasetSubsetType, calculate_complexity: bool = False, log: bool = False):
+  def evaluate_cross_entropy(self, dataset_subset_type: DatasetSubsetType, log: bool = False):
     self.model.eval()
     cross_entropy_loss = 0
-    complexity = 0
     num_correct = 0
 
     data_loader = [self.train_eval_loader, self.test_loader][dataset_subset_type]
@@ -215,8 +198,6 @@ class Experiment:
     for data, target in data_loader:
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       logits = self.model(data)
-      if calculate_complexity:
-        complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type)
       cross_entropy = F.cross_entropy(logits, target, reduction='sum')
       cross_entropy_loss += cross_entropy.item()  # sum up batch loss
       
@@ -224,11 +205,9 @@ class Experiment:
       batch_correct = pred.eq(target.data.view_as(pred)).type(torch.FloatTensor).cpu()
       num_correct += batch_correct.sum()
 
-    if calculate_complexity:
-      complexity = complexity.item()
     cross_entropy_loss /= num_to_evaluate_on
     acc = num_correct.item() / num_to_evaluate_on
     
     if log:
       self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
-    return cross_entropy_loss, acc, complexity, num_correct
+    return cross_entropy_loss, acc, num_correct

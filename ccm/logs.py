@@ -19,27 +19,23 @@ class BaseLogger(object):
     cfg: EConfig,
     state: ETrainingState,
     cross_entropy: torch.Tensor,
-    complexity: torch.Tensor,
     loss: torch.Tensor,
   ) -> None:
     if cfg.log_batch_freq is not None and state.global_batch % cfg.log_batch_freq == 0:
       # Collect metrics for logging
       metrics = {
         'cross_entropy/minibatch': cross_entropy.item(),
-        'complexity/minibatch': complexity.item(),
-        # 'complexity/{}/minibatch'.format(cfg.complexity_type.name): complexity.item(),
         'loss/minibatch': loss.item(),
       }
       # Send metrics to logger
       self.log_metrics(step=state.global_batch, metrics=metrics)
   
-  def log_generalization_gap(self, state: ETrainingState, train_acc: float, val_acc: float, train_loss: float, val_loss: float, complexity: float, all_complexities: Dict[ComplexityType, float]) -> None:
+  def log_generalization_gap(self, state: ETrainingState, train_acc: float, val_acc: float, train_loss: float, val_loss: float, all_complexities: Dict[ComplexityType, float]) -> None:
     self.log_metrics(
       state.global_batch,
       {
         'generalization/error': train_acc - val_acc,
         'generalization/loss': train_loss - val_loss,
-        'complexity': complexity,
         **{'complexity/{}'.format(k.name): v for k,v in all_complexities.items()}
       })
   
@@ -88,7 +84,7 @@ class Printer(object):
           self.experiment_id, epoch,
           train_eval.avg_loss - val_eval.avg_loss, 100. * (train_eval.acc - val_eval.acc),
           0.0, 0.0,
-          train_eval.complexity, train_eval.complexity - 0.0, 0.0,
+          0.0, 0.0, 0.0,
           DatasetSubsetType.TEST.name, val_eval.avg_loss, 100. * val_eval.acc,
           DatasetSubsetType.TRAIN.name, train_eval.avg_loss, 100. * train_eval.acc,
           0.0))
