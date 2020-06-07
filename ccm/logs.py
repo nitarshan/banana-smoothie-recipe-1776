@@ -1,10 +1,6 @@
 import time
 from typing import Dict, Optional
 
-try:
-  from comet_ml import Experiment as CometExperiment
-except:
-  pass
 import numpy as np
 import torch
 try:
@@ -98,33 +94,6 @@ class DefaultLogger(BaseLogger):
   def __del__(self):
     self.writer.flush()
     self.writer.close()
-
-
-class CometLogger(BaseLogger):
-  """
-  Log to Comet.ml
-  """
-
-  def __init__(self, api_key: str, tag: Optional[str] = None, hps: Optional[dict] = None):
-    self.writer = CometExperiment(
-      api_key=api_key,
-      project_name='causal-complexity-measures',
-      workspace='nitarshan',
-      auto_metric_logging=False,
-      auto_output_logging="simple")
-    if tag is not None:
-      self.writer.add_tag(tag)
-    if hps is not None:
-      self.writer.log_parameters(hps)
-
-  def log_metrics(self, step: int, metrics: dict):
-    self.writer.log_metrics(metrics, step=step)
-
-  def log_hparams(self, hps: dict, metrics: dict):
-    pass
-
-  def __del__(self):
-    self.writer.end()
 
 
 class WandbLogger(BaseLogger):
