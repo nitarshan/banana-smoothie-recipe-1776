@@ -11,7 +11,7 @@ from .dataset_helpers import get_dataloaders
 from .experiment_config import (
   ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, OptimizerType)
 from .lagrangian import Lagrangian
-from .logs import BaseLogger, DefaultLogger, Printer
+from .logs import BaseLogger, Printer
 from .measures import get_all_measures, get_single_measure
 from .models import get_model_for_config
 
@@ -22,7 +22,7 @@ class Experiment:
     e_state: ETrainingState,
     device: torch.device,
     e_config: EConfig,
-    logger: Optional[BaseLogger] = None,
+    logger: BaseLogger,
     result_save_callback: Optional[object] = None
   ):
     self.e_state = e_state
@@ -38,11 +38,7 @@ class Experiment:
     torch.backends.cudnn.benchmark = False
 
     # Logging
-    if logger is None:
-      log_file = self.cfg.log_dir / self.cfg.model_type.name / self.cfg.dataset_type.name / self.cfg.optimizer_type.name / self.cfg.complexity_type.name / str(self.cfg.complexity_lambda) / str(self.e_state.id)
-      self.logger = DefaultLogger(log_file)
-    else:
-      self.logger = logger
+    self.logger = logger
     # Printing
     self.printer = Printer(self.e_state.id, self.cfg.verbosity)
     self.result_save_callback = result_save_callback

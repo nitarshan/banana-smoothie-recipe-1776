@@ -3,10 +3,6 @@ from typing import Dict, Optional
 
 import numpy as np
 import torch
-try:
-  from torch.utils.tensorboard import SummaryWriter
-except:
-  pass
 import wandb
 
 from .experiment_config import (
@@ -74,26 +70,6 @@ class BaseLogger(object):
 
   def log_train_end(self, cfg: EConfig) -> None:
     self.log_hparams(cfg.to_tensorboard_dict(), {})
-
-class DefaultLogger(BaseLogger):
-  """
-  Log to Tensorboard
-  """
-
-  def __init__(self, log_file):
-    self.log_file = log_file
-    self.writer = SummaryWriter(log_file)
-
-  def log_metrics(self, step: int, metrics: dict):
-    for m, v in metrics.items():
-      self.writer.add_scalar(m, v, step)
-
-  def log_hparams(self, hps: dict, metrics: dict):
-    self.writer.add_hparams(hps, metrics)
-
-  def __del__(self):
-    self.writer.flush()
-    self.writer.close()
 
 
 class WandbLogger(BaseLogger):
