@@ -19,8 +19,6 @@ class ExperimentBaseModel(nn.Module):
 def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
   if e_config.model_type == ModelType.DEEP:
     return MLP(e_config.model_depth, e_config.model_width, e_config.dataset_type)
-  elif e_config.model_type == ModelType.CONV:
-    return ConvNet(e_config.dataset_type)
   elif e_config.model_type == ModelType.RESNET:
     return ResNet(e_config.dataset_type, e_config.model_depth, e_config.model_width, [16,32,64])
   elif e_config.model_type == ModelType.NIN:
@@ -40,26 +38,6 @@ class MLP(ExperimentBaseModel):
     for layer in self.layers[:-1]:
       x = F.relu(layer(x))
     x = self.layers[-1](x)
-    return x
-
-# https://github.com/pytorch/tutorials/blob/master/beginner_source/blitz/cifar10_tutorial.py
-class ConvNet(ExperimentBaseModel):
-  def __init__(self, dataset_type: DatasetType):
-    super().__init__(dataset_type)
-    self.conv1 = nn.Conv2d(self.dataset_type.D[0], 6, kernel_size=5)
-    self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-    self.conv2 = nn.Conv2d(6, 16, kernel_size=5)
-    self.fc1 = nn.Linear(16 * 5 * 5, 120)
-    self.fc2 = nn.Linear(120, 84)
-    self.fc3 = nn.Linear(84, self.dataset_type.K)
-
-  def forward(self, x) -> torch.Tensor:
-    x = self.pool(F.relu(self.conv1(x)))
-    x = self.pool(F.relu(self.conv2(x)))
-    x = x.view(-1, 16 * 5 * 5)
-    x = F.relu(self.fc1(x))
-    x = F.relu(self.fc2(x))
-    x = self.fc3(x)
     return x
 
 
