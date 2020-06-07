@@ -120,12 +120,6 @@ class Experiment:
             param.data.pow_(2)
 
       complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type, intervention_mode=True)
-      complexity_loss, constraint, is_constrained = torch.zeros((), device=cross_entropy.device), torch.zeros(1, device=cross_entropy.device), False
-
-      if is_constrained and self.cfg.complexity_type.name != 'NONE':
-        complexity_loss.backward()
-
-      loss += complexity_loss.clone()
       
       self.model.train()
 
@@ -138,7 +132,7 @@ class Experiment:
 
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
-      self.logger.log_batch_end(self.cfg, self.e_state, cross_entropy, complexity, loss, constraint)
+      self.logger.log_batch_end(self.cfg, self.e_state, cross_entropy, complexity, loss)
 
       # Cross-entropy stopping check
       if self.cfg.use_dataset_cross_entropy_stopping and batch_idx == ce_check_batches[0]:
@@ -198,7 +192,7 @@ class Experiment:
     self.model.eval()
     data_loader = [self.train_eval_loader, self.test_loader][dataset_subset_type]
 
-    cross_entropy_loss, acc, complexity, constraint_loss, num_correct = self.evaluate_cross_entropy(dataset_subset_type, True, False)
+    cross_entropy_loss, acc, complexity, num_correct = self.evaluate_cross_entropy(dataset_subset_type, True, False)
 
     all_complexities = {}
     if dataset_subset_type == DatasetSubsetType.TRAIN and compute_all_measures:
@@ -206,13 +200,12 @@ class Experiment:
 
     self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
 
-    return EvaluationMetrics(acc, cross_entropy_loss, complexity, constraint_loss, num_correct, len(data_loader.dataset), all_complexities)
+    return EvaluationMetrics(acc, cross_entropy_loss, complexity, num_correct, len(data_loader.dataset), all_complexities)
 
   @torch.no_grad()
   def evaluate_cross_entropy(self, dataset_subset_type: DatasetSubsetType, calculate_complexity: bool = False, log: bool = False):
     self.model.eval()
     cross_entropy_loss = 0
-    constraint_loss = 0
     complexity = 0
     num_correct = 0
 
@@ -226,9 +219,6 @@ class Experiment:
         complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type)
       cross_entropy = F.cross_entropy(logits, target, reduction='sum')
       cross_entropy_loss += cross_entropy.item()  # sum up batch loss
-      if calculate_complexity:
-        total_loss = cross_entropy
-        constraint_loss = (total_loss - cross_entropy).item()
       
       pred = logits.data.max(1, keepdim=True)[1]  # get the index of the max logits
       batch_correct = pred.eq(target.data.view_as(pred)).type(torch.FloatTensor).cpu()
@@ -241,4 +231,4 @@ class Experiment:
     
     if log:
       self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
-    return cross_entropy_loss, acc, complexity, constraint_loss, num_correct
+    return cross_entropy_loss, acc, complexity, num_correct

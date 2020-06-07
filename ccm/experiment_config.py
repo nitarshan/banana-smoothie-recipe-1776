@@ -175,7 +175,6 @@ class EvaluationMetrics(NamedTuple):
   acc: float
   avg_loss: float
   complexity: float
-  complexity_loss: float
   num_correct: int
   num_to_evaluate_on: int
   all_complexities: Dict[ComplexityType, float]

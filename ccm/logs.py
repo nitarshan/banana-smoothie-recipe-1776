@@ -21,7 +21,6 @@ class BaseLogger(object):
     cross_entropy: torch.Tensor,
     complexity: torch.Tensor,
     loss: torch.Tensor,
-    constraint: torch.Tensor
   ) -> None:
     if cfg.log_batch_freq is not None and state.global_batch % cfg.log_batch_freq == 0:
       # Collect metrics for logging
@@ -92,4 +91,4 @@ class Printer(object):
           train_eval.complexity, train_eval.complexity - 0.0, 0.0,
           DatasetSubsetType.TEST.name, val_eval.avg_loss, 100. * val_eval.acc,
           DatasetSubsetType.TRAIN.name, train_eval.avg_loss, 100. * train_eval.acc,
-          train_eval.complexity_loss))
+          0.0))
