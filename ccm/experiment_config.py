@@ -143,8 +143,6 @@ class EConfig:
   lagrangian_start_lambda: Optional[float] = 0
   lagrangian_convergence_tolerance: Optional[float] = 1e-4
   # Global Convergence
-  global_convergence_method: Optional[str] = "leq"
-  global_convergence_tolerance: Optional[float] = 1e-6
   global_convergence_patience: Optional[int] = 30
   global_convergence_target: Optional[float] = 0.01
   global_convergence_evaluation_freq_milestones: Optional[List[float]] = field(default_factory=lambda: [0.05, 0.025, 0.015])

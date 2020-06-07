@@ -7,7 +7,6 @@ import torch
 import torch.nn.functional as F
 from tqdm import trange
 
-from .convergence_detection import ConvergeOnPlateau
 from .dataset_helpers import get_dataloaders
 from .experiment_config import (
   ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, OptimizerType)
@@ -56,13 +55,6 @@ class Experiment:
 
     # Optimizer
     self.optimizer = self._reset_optimizer()
-    self.detector = ConvergeOnPlateau(
-      mode=e_config.global_convergence_method,
-      patience=e_config.global_convergence_patience,
-      threshold=e_config.global_convergence_tolerance,
-      target=e_config.global_convergence_target,
-      verbose=False
-    )
 
     # Constrained Optimization handler
     self.lagrangian = Lagrangian(
@@ -93,7 +85,6 @@ class Experiment:
       'state': self.e_state,
       'model': self.model.state_dict(),
       'optimizer': self.optimizer.state_dict(),
-      'detector': self.detector,
       # 'lagrangian': self.lagrangian,
       'np_rng': np.random.get_state(),
       'torch_rng': torch.get_rng_state(),
@@ -107,7 +98,6 @@ class Experiment:
         self.e_state = checkpoint['state']
         self.model.load_state_dict(checkpoint['model'])
         self.optimizer.load_state_dict(checkpoint['optimizer'])
-        self.detector = checkpoint['detector']
         # self.lagrangian = checkpoint['lagrangian']
         np.random.set_state(checkpoint['np_rng'])
         torch.set_rng_state(checkpoint['torch_rng'])
@@ -179,9 +169,6 @@ class Experiment:
         params_updated, check_global_convergence = self.lagrangian.update_parameters(np.mean(self.e_state.loss_hist), len(self.e_state.loss_hist), self.e_state.global_batch)
         if params_updated:
           self.printer.lagrangian_update(self.e_state, self.lagrangian.constraint_hist, self.lagrangian.lagrangian_mu, self.lagrangian.lagrangian_lambda)
-      
-      if check_global_convergence and not self.cfg.use_dataset_cross_entropy_stopping:
-        self.e_state.converged = self.detector.step(np.mean(self.e_state.loss_hist))
 
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
