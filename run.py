@@ -23,7 +23,6 @@ if __name__=='__main__':
 
   experiment_id = time.time_ns()
   state.id = experiment_id
-  state.loss_hist = deque([], cfg.lagrangian_patience_batches or 1)
   state.subepoch_ce_check_milestones = cfg.global_convergence_evaluation_freq_milestones.copy()
 
   # Run experiment

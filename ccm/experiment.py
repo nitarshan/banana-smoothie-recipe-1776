@@ -10,7 +10,6 @@ from tqdm import trange
 from .dataset_helpers import get_dataloaders
 from .experiment_config import (
   ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics, OptimizerType)
-from .lagrangian import Lagrangian
 from .logs import BaseLogger, Printer
 from .measures import get_all_measures, get_single_measure
 from .models import get_model_for_config
@@ -52,22 +51,6 @@ class Experiment:
     # Optimizer
     self.optimizer = self._reset_optimizer()
 
-    # Constrained Optimization handler
-    self.lagrangian = Lagrangian(
-      self.cfg.lagrangian_type,
-      self.cfg.lagrangian_tolerance,
-      self.cfg.lagrangian_target,
-      self.cfg.lagrangian_start_epoch,
-      self.cfg.lagrangian_improvement_rate,
-      self.cfg.lagrangian_patience_batches,
-      self.cfg.lagrangian_convergence_tolerance,
-      self.cfg.lagrangian_start_mu,
-      self.cfg.lagrangian_start_lambda,
-      self.cfg.global_convergence_patience,
-      self.cfg.complexity_lambda,
-      self.logger,
-    )
-
     # Load data
     self.train_loader, self.train_eval_loader, self.test_loader = get_dataloaders(self.cfg, self.device)
 
@@ -81,7 +64,6 @@ class Experiment:
       'state': self.e_state,
       'model': self.model.state_dict(),
       'optimizer': self.optimizer.state_dict(),
-      # 'lagrangian': self.lagrangian,
       'np_rng': np.random.get_state(),
       'torch_rng': torch.get_rng_state(),
     }, checkpoint_file)
@@ -94,7 +76,6 @@ class Experiment:
         self.e_state = checkpoint['state']
         self.model.load_state_dict(checkpoint['model'])
         self.optimizer.load_state_dict(checkpoint['optimizer'])
-        # self.lagrangian = checkpoint['lagrangian']
         np.random.set_state(checkpoint['np_rng'])
         torch.set_rng_state(checkpoint['torch_rng'])
       print(f'loading from checkpoint at epoch {self.e_state.epoch} global batch {self.e_state.global_batch}')
@@ -139,16 +120,12 @@ class Experiment:
             param.data.pow_(2)
 
       complexity = get_single_measure(self.model, self.init_model, self.cfg.complexity_type, intervention_mode=True)
-
-      # Assemble the loss function based on the optimization method
-      complexity_loss, constraint, is_constrained = self.lagrangian.make_loss(torch.zeros((), device=cross_entropy.device), complexity, self.e_state.epoch)
+      complexity_loss, constraint, is_constrained = torch.zeros((), device=cross_entropy.device), torch.zeros(1, device=cross_entropy.device), False
 
       if is_constrained and self.cfg.complexity_type.name != 'NONE':
         complexity_loss.backward()
 
       loss += complexity_loss.clone()
-
-      self.e_state.loss_hist.append(loss.item())
       
       self.model.train()
 
@@ -159,16 +136,9 @@ class Experiment:
 
       self.optimizer.step()
 
-      # Update lagrangian parameters
-      check_global_convergence = (not is_constrained) and (self.e_state.global_batch % self.cfg.lagrangian_patience_batches == 0)
-      if is_constrained:
-        params_updated, check_global_convergence = self.lagrangian.update_parameters(np.mean(self.e_state.loss_hist), len(self.e_state.loss_hist), self.e_state.global_batch)
-        if params_updated:
-          self.printer.lagrangian_update(self.e_state, self.lagrangian.constraint_hist, self.lagrangian.lagrangian_mu, self.lagrangian.lagrangian_lambda)
-
       # Log everything
       self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
-      self.logger.log_batch_end(self.cfg, self.e_state, self.lagrangian, cross_entropy, complexity, loss, constraint)
+      self.logger.log_batch_end(self.cfg, self.e_state, cross_entropy, complexity, loss, constraint)
 
       # Cross-entropy stopping check
       if self.cfg.use_dataset_cross_entropy_stopping and batch_idx == ce_check_batches[0]:
@@ -203,7 +173,7 @@ class Experiment:
         train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.cfg.epochs or self.e_state.converged))
         val_eval = self.evaluate(DatasetSubsetType.TEST)
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.complexity, train_eval.all_complexities)
-        self.printer.epoch_metrics(self.cfg, self.e_state, self.lagrangian.constraint_hist, epoch, train_eval, val_eval)
+        self.printer.epoch_metrics(self.cfg, self.e_state, epoch, train_eval, val_eval)
       
       if epoch==self.cfg.epochs or self.e_state.converged:
         self.result_save_callback(epoch, val_eval, train_eval)
@@ -257,7 +227,7 @@ class Experiment:
       cross_entropy = F.cross_entropy(logits, target, reduction='sum')
       cross_entropy_loss += cross_entropy.item()  # sum up batch loss
       if calculate_complexity:
-        total_loss, _, _ = self.lagrangian.make_loss(cross_entropy, complexity, self.e_state.epoch)
+        total_loss = cross_entropy
         constraint_loss = (total_loss - cross_entropy).item()
       
       pred = logits.data.max(1, keepdim=True)[1]  # get the index of the max logits

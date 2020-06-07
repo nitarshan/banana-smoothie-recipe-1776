@@ -88,13 +88,7 @@ class Verbosity(IntEnum):
   NONE = 1
   RUN = 2
   EPOCH = 3
-  LAGRANGIAN = 4
-  BATCH = 5
-
-class LagrangianType(Enum):
-  NONE = 1
-  PENALTY = 2
-  AUGMENTED = 3
+  BATCH = 4
 
 @dataclass(frozen=False)
 class ETrainingState:
@@ -102,7 +96,6 @@ class ETrainingState:
   epoch: int = 1
   batch: int = 1
   global_batch: int = 1
-  loss_hist: Deque[float] = deque([])
   converged: bool = False
   subepoch_ce_check_freq: int = 0
   subepoch_ce_check_milestones: Optional[List[float]] = None
@@ -128,20 +121,7 @@ class EConfig:
   optimizer_type: OptimizerType = OptimizerType.SGD_MOMENTUM
   lr: float = 0.01
   complexity_type: ComplexityType = ComplexityType.NONE
-  complexity_lambda: Optional[float] = None
-  # Constrained Optimization
-  lagrangian_type: LagrangianType = LagrangianType.NONE
-  lagrangian_start_epoch: Optional[int] = 0
-  lagrangian_target: Optional[float] = 0
-  lagrangian_tolerance: Optional[float] = 0.1
-  lagrangian_start_mu: Optional[float] = 1e-6
-  lagrangian_patience_batches: Optional[int] = 200
-  lagrangian_improvement_rate: Optional[float] = 0.75
-  ## Augmented Lagrangian Terms
-  lagrangian_start_lambda: Optional[float] = 0
-  lagrangian_convergence_tolerance: Optional[float] = 1e-4
   # Global Convergence
-  global_convergence_patience: Optional[int] = 30
   global_convergence_target: Optional[float] = 0.01
   global_convergence_evaluation_freq_milestones: Optional[List[float]] = field(default_factory=lambda: [0.05, 0.025, 0.015])
   # Visibility (default no visibility)
@@ -150,32 +130,13 @@ class EConfig:
   save_epoch_freq: Optional[int] = 1
   root_dir: Path = Path('.')
   data_dir: Path = Path('data')
-  verbosity: Verbosity = Verbosity.LAGRANGIAN
+  verbosity: Verbosity = Verbosity.EPOCH
   use_tqdm: bool = False
   use_dataset_cross_entropy_stopping: bool = True
   base_width: int = 25
 
   # Validation
   def __post_init__(self):
-    if self.lagrangian_type != LagrangianType.NONE:
-      lagrangian_params = {
-        self.lagrangian_start_epoch,
-        self.lagrangian_target,
-        self.lagrangian_tolerance,
-        self.lagrangian_start_mu,
-        self.lagrangian_patience_batches,
-        self.lagrangian_improvement_rate,
-      }
-      if None in lagrangian_params:
-        raise KeyError
-    if self.lagrangian_type == LagrangianType.AUGMENTED:
-      augmented_params = {
-        self.lagrangian_start_lambda,
-        self.lagrangian_convergence_tolerance,
-      }
-      if None in augmented_params:
-        raise KeyError
-
     # Set up directories
     for directory in ('results', 'logs', 'checkpoints'):
       (self.root_dir / directory).mkdir(parents=True, exist_ok=True)
