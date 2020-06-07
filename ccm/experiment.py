@@ -217,9 +217,7 @@ class Experiment:
         print('Converged')
         break
 
-    self.logger.log_train_end(self.cfg)
     self.printer.train_end()
-    del self.logger
 
     if train_eval is None or val_eval is None:
       raise RuntimeError

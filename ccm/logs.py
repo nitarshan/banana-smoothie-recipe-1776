@@ -15,9 +15,6 @@ class BaseLogger(object):
   def log_metrics(self, step: int, metrics: Dict[str, float]):
     raise NotImplementedError()
 
-  def log_hparams(self, hps: dict, metrics: dict):
-    raise NotImplementedError()
-
   def log_batch_end(
     self,
     cfg: EConfig,
@@ -68,9 +65,6 @@ class BaseLogger(object):
         'accuracy/{}'.format(datasubset.name.lower()): acc,
       })
 
-  def log_train_end(self, cfg: EConfig) -> None:
-    self.log_hparams(cfg.to_tensorboard_dict(), {})
-
 
 class WandbLogger(BaseLogger):
   def __init__(self, tag: Optional[str] = None, hps: Optional[dict] = None, group: Optional[str] = None):
@@ -78,12 +72,6 @@ class WandbLogger(BaseLogger):
 
   def log_metrics(self, step: int, metrics: dict):
     wandb.log(metrics, step=step)
-
-  def log_hparams(self, hps: dict, metrics: dict):
-    pass
-
-  def __del__(self):
-    pass
 
 
 class Printer(object):
