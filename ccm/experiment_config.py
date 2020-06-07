@@ -22,8 +22,7 @@ class DatasetSubsetType(IntEnum):
 
 class ModelType(Enum):
   DEEP = 1
-  RESNET = 2
-  NIN = 3
+  NIN = 2
 
 class ComplexityType(Enum):
   NONE = 1
