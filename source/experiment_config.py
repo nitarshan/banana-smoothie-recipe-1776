@@ -1,9 +1,8 @@
-from collections import deque
 from dataclasses import asdict, dataclass, field
 from enum import Enum, IntEnum
 import hashlib
 from pathlib import Path
-from typing import Deque, Dict, List, NamedTuple, Optional
+from typing import Dict, List, NamedTuple, Optional
 
 
 class DatasetType(Enum):

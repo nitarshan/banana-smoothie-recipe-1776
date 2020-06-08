@@ -1,5 +1,3 @@
-from typing import List
-
 import numpy as np
 from torch import Tensor
 import torch.nn as nn

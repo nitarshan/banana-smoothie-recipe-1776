@@ -6,7 +6,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 import torchvision as tv
 
-from .experiment_config import EConfig, DatasetType
+from .experiment_config import DatasetType, EConfig
 
 
 def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, DataLoader, DataLoader]:

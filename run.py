@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import pickle
 import time
-from collections import deque
 
-import torch
 import simple_parsing
+import torch
 
 from source.experiment import Experiment
 from source.experiment_config import EConfig, ETrainingState

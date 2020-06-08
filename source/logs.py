@@ -1,13 +1,17 @@
 import time
 from typing import Dict, Optional
 
-import numpy as np
 from torch import Tensor
 import wandb
 
 from .experiment_config import (
-  ComplexityType, DatasetSubsetType, EConfig, ETrainingState, EvaluationMetrics,
-  Verbosity)
+  ComplexityType,
+  DatasetSubsetType,
+  EConfig,
+  ETrainingState,
+  EvaluationMetrics,
+  Verbosity,
+)
 
 
 class BaseLogger(object):
