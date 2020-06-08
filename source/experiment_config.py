@@ -96,8 +96,8 @@ class ETrainingState:
   batch: int = 1
   global_batch: int = 1
   converged: bool = False
-  subepoch_ce_check_freq: int = 0
-  subepoch_ce_check_milestones: Optional[List[float]] = None
+  ce_check_freq: int = 0
+  ce_check_milestones: Optional[List[float]] = None
 
 # Configuration for the experiment
 @dataclass(frozen=True)
@@ -119,9 +119,9 @@ class EConfig:
   epochs: int = 300
   optimizer_type: OptimizerType = OptimizerType.SGD_MOMENTUM
   lr: float = 0.01
-  # Global Convergence
-  global_convergence_target: Optional[float] = 0.01
-  global_convergence_evaluation_freq_milestones: Optional[List[float]] = field(default_factory=lambda: [0.05, 0.025, 0.015])
+  # Cross-entropy stopping criterion
+  ce_target: Optional[float] = 0.01
+  ce_target_milestones: Optional[List[float]] = field(default_factory=lambda: [0.05, 0.025, 0.015])
   # Visibility (default no visibility)
   log_batch_freq: Optional[int] = None
   log_epoch_freq: Optional[int] = 10

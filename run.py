@@ -22,7 +22,7 @@ if __name__=='__main__':
 
   experiment_id = time.time_ns()
   state.id = experiment_id
-  state.subepoch_ce_check_milestones = cfg.global_convergence_evaluation_freq_milestones.copy()
+  state.ce_check_milestones = cfg.ce_target_milestones.copy()
 
   # Run experiment
   device = torch.device('cuda' if cfg.use_cuda else 'cpu')

@@ -99,7 +99,7 @@ class Experiment:
   
   def _train_epoch(self) -> None:
     self.model.train()
-    ce_check_batches = [(len(self.train_loader)//(2**(self.e_state.subepoch_ce_check_freq))) * (i+1) for i in range(2**(self.e_state.subepoch_ce_check_freq)-1)]
+    ce_check_batches = [(len(self.train_loader)//(2**(self.e_state.ce_check_freq))) * (i+1) for i in range(2**(self.e_state.ce_check_freq)-1)]
     ce_check_batches.append(len(self.train_loader)-1)
 
     for batch_idx, (data, target) in enumerate(self.train_loader):
@@ -129,14 +129,14 @@ class Experiment:
         ce_check_batches.pop(0)
         is_last_batch = batch_idx == (len(self.train_loader)-1)
         dataset_ce = self.evaluate_cross_entropy(DatasetSubsetType.TRAIN, log=is_last_batch)[0]
-        if dataset_ce < self.cfg.global_convergence_target:
+        if dataset_ce < self.cfg.ce_target:
           self.e_state.converged = True
         else:
-          while len(self.e_state.subepoch_ce_check_milestones) > 0 and dataset_ce <= self.e_state.subepoch_ce_check_milestones[0]:
-            passed_milestone = self.e_state.subepoch_ce_check_milestones[0]
+          while len(self.e_state.ce_check_milestones) > 0 and dataset_ce <= self.e_state.ce_check_milestones[0]:
+            passed_milestone = self.e_state.ce_check_milestones[0]
             print(f'passed ce milestone {passed_milestone}')
-            self.e_state.subepoch_ce_check_milestones.pop(0)
-            self.e_state.subepoch_ce_check_freq += 1
+            self.e_state.ce_check_milestones.pop(0)
+            self.e_state.ce_check_freq += 1
             if self.cfg.save_epoch_freq is not None:
               self.save_state(f'_ce_{passed_milestone}')
 
