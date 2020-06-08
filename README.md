@@ -19,4 +19,15 @@ python3.8 -m pip install -r requirements.txt
 ```
 
 ## Directory structure
-### Todo
+```
+├── results
+    └── tsvs
+        └── ...
+├── scripts
+    ├── ...
+    └── ...
+├── source
+    ├── ...
+    └── ...
+└── run.py
+```
