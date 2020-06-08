@@ -2,6 +2,7 @@ from typing import Tuple
 
 import numpy as np
 import torch
+from torch import Tensor
 from torch.utils.data import DataLoader
 import torchvision as tv
 
@@ -31,7 +32,7 @@ def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, Dat
   return train_loader, train_eval_loader, test_loader
 
 
-def process_data(cfg: EConfig, data: torch.Tensor, targets: torch.Tensor, device: torch.device, train: bool):
+def process_data(cfg: EConfig, data: Tensor, targets: Tensor, device: torch.device, train: bool):
   # Resize dataset
   dataset_size = cfg.train_dataset_size if train else cfg.test_dataset_size
   offset = 0 if train else 1

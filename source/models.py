@@ -1,7 +1,7 @@
 from typing import List
 
 import numpy as np
-import torch
+from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -13,7 +13,7 @@ class ExperimentBaseModel(nn.Module):
     super().__init__()
     self.dataset_type = dataset_type
 
-  def forward(self, x) -> torch.Tensor:
+  def forward(self, x) -> Tensor:
     raise NotImplementedError
 
 def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
@@ -31,7 +31,7 @@ class MLP(ExperimentBaseModel):
       [nn.Linear(width, width) for i in range(depth-1)] + # Hidden
       [nn.Linear(width, self.dataset_type.K)]) # Output
 
-  def forward(self, x) -> torch.Tensor:
+  def forward(self, x) -> Tensor:
     x = x.view(-1, np.prod(self.dataset_type.D))
     for layer in self.layers[:-1]:
       x = F.relu(layer(x))

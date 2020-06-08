@@ -2,7 +2,7 @@ import time
 from typing import Dict, Optional
 
 import numpy as np
-import torch
+from torch import Tensor
 import wandb
 
 from .experiment_config import (
@@ -18,8 +18,8 @@ class BaseLogger(object):
     self,
     cfg: EConfig,
     state: ETrainingState,
-    cross_entropy: torch.Tensor,
-    loss: torch.Tensor,
+    cross_entropy: Tensor,
+    loss: Tensor,
   ) -> None:
     if cfg.log_batch_freq is not None and state.global_batch % cfg.log_batch_freq == 0:
       # Collect metrics for logging
