@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --partition=long
-#SBATCH --job-name=ccm
+#SBATCH --job-name=rgm
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:1
 #SBATCH --mem=12G
@@ -13,7 +13,7 @@ module purge
 module load anaconda/3
 source $CONDA_ACTIVATE
 conda activate base
-conda activate ccm
+conda activate rgm
 
 # 2. Prepare directories and copy dataset onto the compute node
 echo "Loading Datasets!"

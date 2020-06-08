@@ -6,9 +6,9 @@ from collections import deque
 import torch
 import simple_parsing
 
-from ccm.experiment import Experiment
-from ccm.experiment_config import EConfig, ETrainingState
-from ccm.logs import WandbLogger
+from source.experiment import Experiment
+from source.experiment_config import EConfig, ETrainingState
+from source.logs import WandbLogger
 
 
 if __name__=='__main__':
