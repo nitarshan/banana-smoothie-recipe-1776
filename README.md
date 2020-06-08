@@ -1,17 +1,22 @@
-# Causal Complexity Measures
+# In Search of Robust Measures of Generalization
 
-Hello! To make use of this repository you need to first set up the conda environment for it:
-1) `conda env create -f environment.yml`
-2) `conda activate rgm`
+This repository contains the code, data, and analysis for the paper "In Search of Robust Measures of Generalization".
 
-Look at `single` and `multi` in `run_experiment.py` to see how an experiment can be launched (`multi` handles parallelizing of CPU experiments within python), and look at `experiment_config.py` for experiment options. For calling these methods via command-line or for usage on SLURM, see a simple example script in `submit_job.sh`.
-
-After running an experiment, you can share the tensorboard logs via http://tensorboard.dev to a public link.
-
-## Tests
-
-You can run all tests by running the following command from the project directory:
-
+## Environment setup
+### Conda
+```bash
+conda env create -f environment.yml
+conda activate rgm
 ```
-python -m unittest discover -s tests
+
+### Venv
+```bash
+sudo apt-get install python3.8 python3.8-dev python3.8-distutils python3.8-venv
+python3.8 -m venv env
+source env/bin/activate
+python3.8 -m pip install -U pip
+python3.8 -m pip install -r requirements.txt
 ```
+
+## Directory structure
+### Todo

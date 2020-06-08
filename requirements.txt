@@ -1,7 +1,8 @@
-numpy
-scipy
-torch
-torchvision
-tqdm
-wandb
-simple-parsing
+numpy==1.18
+pandas==1.0
+scipy==1.4
+torch==1.5
+torchvision==0.6
+tqdm==4.46
+wandb==0.9
+simple-parsing==0.0.10
