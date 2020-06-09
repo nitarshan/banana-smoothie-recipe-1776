@@ -116,3 +116,4 @@ data/
 results/
 !results/tsvs/
 wandb/
+plots/
