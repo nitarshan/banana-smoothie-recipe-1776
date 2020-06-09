@@ -14,11 +14,11 @@ class ExperimentBaseModel(nn.Module):
   def forward(self, x) -> Tensor:
     raise NotImplementedError
 
-def get_model_for_config(e_config: HParams) -> ExperimentBaseModel:
-  if e_config.model_type == ModelType.DEEP:
-    return MLP(e_config.model_depth, e_config.model_width, e_config.dataset_type)
-  elif e_config.model_type == ModelType.NIN:
-    return NiN(e_config.model_depth, e_config.model_width, e_config.base_width, e_config.dataset_type)
+def get_model_for_config(hparams: HParams) -> ExperimentBaseModel:
+  if hparams.model_type == ModelType.DEEP:
+    return MLP(hparams.model_depth, hparams.model_width, hparams.dataset_type)
+  elif hparams.model_type == ModelType.NIN:
+    return NiN(hparams.model_depth, hparams.model_width, hparams.base_width, hparams.dataset_type)
   raise KeyError
 
 class MLP(ExperimentBaseModel):

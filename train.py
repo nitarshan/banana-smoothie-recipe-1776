@@ -30,7 +30,7 @@ if __name__=='__main__':
   def dump_results(epoch, val_eval, train_eval):
     results = {
       'e_state': state,
-      'e_config': hparams,
+      'hparams': hparams,
       'final_results_val': val_eval,
       'final_results_train': train_eval,
     }
