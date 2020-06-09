@@ -108,6 +108,7 @@ class EConfig:
   model_type: ModelType = ModelType.NIN
   model_depth: int = 2
   model_width: int = 8
+  base_width: int = 25
   # Dataset
   dataset_type: DatasetType = DatasetType.CIFAR10
   data_seed: Optional[int] = 42
@@ -130,8 +131,6 @@ class EConfig:
   data_dir: Path = Path('data')
   verbosity: Verbosity = Verbosity.EPOCH
   use_tqdm: bool = False
-  use_dataset_cross_entropy_stopping: bool = True
-  base_width: int = 25
 
   # Validation
   def __post_init__(self):

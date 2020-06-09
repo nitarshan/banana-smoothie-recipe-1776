@@ -125,7 +125,7 @@ class Experiment:
       self.logger.log_batch_end(self.cfg, self.e_state, cross_entropy, loss)
 
       # Cross-entropy stopping check
-      if self.cfg.use_dataset_cross_entropy_stopping and batch_idx == ce_check_batches[0]:
+      if batch_idx == ce_check_batches[0]:
         ce_check_batches.pop(0)
         is_last_batch = batch_idx == (len(self.train_loader)-1)
         dataset_ce = self.evaluate_cross_entropy(DatasetSubsetType.TRAIN, log=is_last_batch)[0]
