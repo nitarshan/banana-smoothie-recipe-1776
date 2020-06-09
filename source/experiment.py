@@ -25,30 +25,30 @@ class Experiment:
     self,
     e_state: ETrainingState,
     device: torch.device,
-    e_config: HParams,
+    hparams: HParams,
     logger: BaseLogger,
     result_save_callback: Optional[object] = None
   ):
     self.e_state = e_state
     self.device = device
-    self.cfg = e_config
+    self.hparams = hparams
     
     # Random Seeds
-    random.seed(self.cfg.seed)
-    np.random.seed(self.cfg.seed)
-    torch.manual_seed(self.cfg.seed)
-    torch.cuda.manual_seed_all(self.cfg.seed)
+    random.seed(self.hparams.seed)
+    np.random.seed(self.hparams.seed)
+    torch.manual_seed(self.hparams.seed)
+    torch.cuda.manual_seed_all(self.hparams.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
     # Logging
     self.logger = logger
     # Printing
-    self.printer = Printer(self.e_state.id, self.cfg.verbosity)
+    self.printer = Printer(self.e_state.id, self.hparams.verbosity)
     self.result_save_callback = result_save_callback
 
     # Model
-    self.model = get_model_for_config(self.cfg)
+    self.model = get_model_for_config(self.hparams)
     print("Number of parameters", sum(p.numel() for p in self.model.parameters() if p.requires_grad))
     self.model.to(device)
     self.init_model = deepcopy(self.model)
@@ -57,15 +57,15 @@ class Experiment:
     self.optimizer = self._reset_optimizer()
 
     # Load data
-    self.train_loader, self.train_eval_loader, self.test_loader = get_dataloaders(self.cfg, self.device)
+    self.train_loader, self.train_eval_loader, self.test_loader = get_dataloaders(self.hparams, self.device)
 
     # Resume from checkpoint if available
     self.load_state()
 
   def save_state(self, postfix: str = '') -> None:
-    checkpoint_file = self.cfg.checkpoint_dir / (self.cfg.md5 + postfix + '.pt')
+    checkpoint_file = self.hparams.checkpoint_dir / (self.hparams.md5 + postfix + '.pt')
     torch.save({
-      'config': self.cfg,
+      'config': self.hparams,
       'state': self.e_state,
       'model': self.model.state_dict(),
       'optimizer': self.optimizer.state_dict(),
@@ -75,7 +75,7 @@ class Experiment:
 
   def load_state(self) -> None:
     try:
-      checkpoint_file = self.cfg.checkpoint_dir / (self.cfg.md5 + '.pt')
+      checkpoint_file = self.hparams.checkpoint_dir / (self.hparams.md5 + '.pt')
       checkpoint = torch.load(checkpoint_file)
       if checkpoint is not None:
         self.e_state = checkpoint['state']
@@ -88,12 +88,12 @@ class Experiment:
       print('no checkpoint found')
 
   def _reset_optimizer(self) -> torch.optim.Optimizer:
-    if self.cfg.optimizer_type == OptimizerType.SGD:
-      return torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr)
-    elif self.cfg.optimizer_type == OptimizerType.SGD_MOMENTUM:
-      return torch.optim.SGD(self.model.parameters(), lr=self.cfg.lr, momentum=0.9)
-    elif self.cfg.optimizer_type == OptimizerType.ADAM:
-      return torch.optim.Adam(self.model.parameters(), lr=self.cfg.lr)
+    if self.hparams.optimizer_type == OptimizerType.SGD:
+      return torch.optim.SGD(self.model.parameters(), lr=self.hparams.lr)
+    elif self.hparams.optimizer_type == OptimizerType.SGD_MOMENTUM:
+      return torch.optim.SGD(self.model.parameters(), lr=self.hparams.lr, momentum=0.9)
+    elif self.hparams.optimizer_type == OptimizerType.ADAM:
+      return torch.optim.Adam(self.model.parameters(), lr=self.hparams.lr)
     else:
       raise KeyError
   
@@ -121,15 +121,15 @@ class Experiment:
       self.optimizer.step()
 
       # Log everything
-      self.printer.batch_end(self.cfg, self.e_state, data, self.train_loader, loss)
-      self.logger.log_batch_end(self.cfg, self.e_state, cross_entropy, loss)
+      self.printer.batch_end(self.hparams, self.e_state, data, self.train_loader, loss)
+      self.logger.log_batch_end(self.hparams, self.e_state, cross_entropy, loss)
 
       # Cross-entropy stopping check
       if batch_idx == ce_check_batches[0]:
         ce_check_batches.pop(0)
         is_last_batch = batch_idx == (len(self.train_loader)-1)
         dataset_ce = self.evaluate_cross_entropy(DatasetSubsetType.TRAIN, log=is_last_batch)[0]
-        if dataset_ce < self.cfg.ce_target:
+        if dataset_ce < self.hparams.ce_target:
           self.e_state.converged = True
         else:
           while len(self.e_state.ce_check_milestones) > 0 and dataset_ce <= self.e_state.ce_check_milestones[0]:
@@ -137,7 +137,7 @@ class Experiment:
             print(f'passed ce milestone {passed_milestone}')
             self.e_state.ce_check_milestones.pop(0)
             self.e_state.ce_check_freq += 1
-            if self.cfg.save_epoch_freq is not None:
+            if self.hparams.save_epoch_freq is not None:
               self.save_state(f'_ce_{passed_milestone}')
 
       if self.e_state.converged:
@@ -148,22 +148,22 @@ class Experiment:
     train_eval, val_eval = None, None
     
     self.e_state.global_batch = 0
-    for epoch in trange(self.e_state.epoch, self.cfg.epochs + 1, disable=(not self.cfg.use_tqdm)):
+    for epoch in trange(self.e_state.epoch, self.hparams.epochs + 1, disable=(not self.hparams.use_tqdm)):
       self.e_state.epoch = epoch
       self._train_epoch()
       
-      is_evaluation_epoch = (epoch==1 or epoch==self.cfg.epochs or epoch % self.cfg.log_epoch_freq == 0)
+      is_evaluation_epoch = (epoch==1 or epoch==self.hparams.epochs or epoch % self.hparams.log_epoch_freq == 0)
       if is_evaluation_epoch or self.e_state.converged:
-        train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.cfg.epochs or self.e_state.converged))
+        train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.hparams.epochs or self.e_state.converged))
         val_eval = self.evaluate(DatasetSubsetType.TEST)
         self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.all_complexities)
-        self.printer.epoch_metrics(self.cfg, self.e_state, epoch, train_eval, val_eval)
+        self.printer.epoch_metrics(self.hparams, self.e_state, epoch, train_eval, val_eval)
       
-      if epoch==self.cfg.epochs or self.e_state.converged:
+      if epoch==self.hparams.epochs or self.e_state.converged:
         self.result_save_callback(epoch, val_eval, train_eval)
 
       # Save state
-      is_save_epoch = self.cfg.save_epoch_freq is not None and (epoch % self.cfg.save_epoch_freq == 0 or epoch==self.cfg.epochs or self.e_state.converged)
+      is_save_epoch = self.hparams.save_epoch_freq is not None and (epoch % self.hparams.save_epoch_freq == 0 or epoch==self.hparams.epochs or self.e_state.converged)
       if is_save_epoch:
         self.save_state()
 
@@ -188,7 +188,7 @@ class Experiment:
     if dataset_subset_type == DatasetSubsetType.TRAIN and compute_all_measures:
       all_complexities = get_all_measures(self.model, self.init_model, data_loader, acc)
 
-    self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
+    self.logger.log_epoch_end(self.hparams, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
 
     return EvaluationMetrics(acc, cross_entropy_loss, num_correct, len(data_loader.dataset), all_complexities)
 
@@ -215,5 +215,5 @@ class Experiment:
     acc = num_correct.item() / num_to_evaluate_on
     
     if log:
-      self.logger.log_epoch_end(self.cfg, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
+      self.logger.log_epoch_end(self.hparams, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
     return cross_entropy_loss, acc, num_correct
