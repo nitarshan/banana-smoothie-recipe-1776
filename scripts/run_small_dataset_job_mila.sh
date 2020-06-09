@@ -30,7 +30,7 @@ tar -xvzf $SLURM_TMPDIR/data/cifar-10-python.tar.gz -C $SLURM_TMPDIR/data/
 echo "Launching Experiment"
 seeds="0 1 2 3 4"
 for seed in $seeds; do
-  python run.py --seed=$seed --root_dir=$SLURM_TMPDIR --data_dir=$SLURM_TMPDIR/data --id=1 "$@"
+  python train.py --seed=$seed --root_dir=$SLURM_TMPDIR --data_dir=$SLURM_TMPDIR/data --id=1 "$@"
 done
 
 # 4. Move experiment outputs

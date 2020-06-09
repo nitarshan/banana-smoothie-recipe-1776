@@ -26,7 +26,7 @@ cp $SCRATCH/datasets/test_32x32.mat $SLURM_TMPDIR/data/
 echo "Launching run"
 seeds="0 1 2 3 4"
 for seed in $seeds; do
-  python run.py --seed=$seed --root_dir=$SLURM_TMPDIR --data_dir=$SLURM_TMPDIR/data --id=1 --dataset_type=SVHN --train_dataset_size=50000 --test_dataset_size=10000 "$@"
+  python train.py --seed=$seed --root_dir=$SLURM_TMPDIR --data_dir=$SLURM_TMPDIR/data --id=1 --dataset_type=SVHN --train_dataset_size=50000 --test_dataset_size=10000 "$@"
 done
 
 # 4. Move experiment outputs

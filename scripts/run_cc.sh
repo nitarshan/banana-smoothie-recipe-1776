@@ -32,7 +32,7 @@ tar -xvzf $SLURM_TMPDIR/data/cifar-100-python.tar.gz -C $SLURM_TMPDIR/data/
 
 # 4. Launch your job
 echo "Launching run"
-python run.py --root_dir=$SLURM_TMPDIR --data_dir=$SLURM_TMPDIR/data --id=1 "$@"
+python train.py --root_dir=$SLURM_TMPDIR --data_dir=$SLURM_TMPDIR/data --id=1 "$@"
 
 # 5. Move experiment outputs
 mkdir -p $SCRATCH/causal-capacity-measures/results/
