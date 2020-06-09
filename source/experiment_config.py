@@ -163,6 +163,16 @@ class HParams:
     dictionary['seed'] = 0
     return hashlib.md5(str(dictionary).encode('utf-8')).hexdigest()
 
+# Configuration which doesn't affect experiment results
+@dataclass(frozen=True)
+class Config:
+  log_batch_freq: Optional[int] = None
+  log_epoch_freq: Optional[int] = 10
+  save_epoch_freq: Optional[int] = 1
+  root_dir: Path = Path('.')
+  data_dir: Path = Path('data')
+  verbosity: Verbosity = Verbosity.EPOCH
+  use_tqdm: bool = False
 
 class EvaluationMetrics(NamedTuple):
   acc: float
