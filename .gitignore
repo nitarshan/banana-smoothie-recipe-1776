@@ -113,7 +113,6 @@ venv.bak/
 env/
 checkpoints/
 data/
-logs/
 results/
 !results/tsvs/
 wandb/

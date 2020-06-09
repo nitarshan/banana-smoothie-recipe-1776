@@ -136,12 +136,8 @@ class EConfig:
   # Validation
   def __post_init__(self):
     # Set up directories
-    for directory in ('results', 'logs', 'checkpoints'):
+    for directory in ('results', 'checkpoints'):
       (self.root_dir / directory).mkdir(parents=True, exist_ok=True)
-
-  @property
-  def log_dir(self):
-    return self.root_dir / 'logs'
 
   @property
   def checkpoint_dir(self):
