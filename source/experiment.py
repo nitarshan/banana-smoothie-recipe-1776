@@ -11,7 +11,7 @@ from .dataset_helpers import get_dataloaders
 from .experiment_config import (
   DatasetSubsetType,
   HParams,
-  ETrainingState,
+  State,
   EvaluationMetrics,
   OptimizerType,
 )
@@ -23,7 +23,7 @@ from .models import get_model_for_config
 class Experiment:
   def __init__(
     self,
-    e_state: ETrainingState,
+    e_state: State,
     device: torch.device,
     hparams: HParams,
     logger: BaseLogger,

@@ -90,7 +90,7 @@ class Verbosity(IntEnum):
   BATCH = 4
 
 @dataclass(frozen=False)
-class ETrainingState:
+class State:
   id: int = 0
   epoch: int = 1
   batch: int = 1
