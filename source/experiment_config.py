@@ -99,9 +99,9 @@ class ETrainingState:
   ce_check_freq: int = 0
   ce_check_milestones: Optional[List[float]] = None
 
-# Configuration for the experiment
+# Hyperparameters that uniquely determine the experiment
 @dataclass(frozen=True)
-class EConfig:
+class HParams:
   seed: int = 0
   use_cuda: bool = True
   # Model

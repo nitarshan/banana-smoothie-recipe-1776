@@ -10,7 +10,7 @@ from tqdm import trange
 from .dataset_helpers import get_dataloaders
 from .experiment_config import (
   DatasetSubsetType,
-  EConfig,
+  HParams,
   ETrainingState,
   EvaluationMetrics,
   OptimizerType,
@@ -25,7 +25,7 @@ class Experiment:
     self,
     e_state: ETrainingState,
     device: torch.device,
-    e_config: EConfig,
+    e_config: HParams,
     logger: BaseLogger,
     result_save_callback: Optional[object] = None
   ):

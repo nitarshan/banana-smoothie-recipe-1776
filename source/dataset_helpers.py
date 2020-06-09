@@ -6,10 +6,10 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 import torchvision as tv
 
-from .experiment_config import DatasetType, EConfig
+from .experiment_config import DatasetType, HParams
 
 
-def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, DataLoader, DataLoader]:
+def get_dataloaders(cfg: HParams, device: torch.device) -> Tuple[DataLoader, DataLoader, DataLoader]:
   if cfg.dataset_type == DatasetType.MNIST:
     dataset = MNIST
   elif cfg.dataset_type == DatasetType.CIFAR10:
@@ -32,7 +32,7 @@ def get_dataloaders(cfg: EConfig, device: torch.device) -> Tuple[DataLoader, Dat
   return train_loader, train_eval_loader, test_loader
 
 
-def process_data(cfg: EConfig, data: Tensor, targets: Tensor, device: torch.device, train: bool):
+def process_data(cfg: HParams, data: Tensor, targets: Tensor, device: torch.device, train: bool):
   # Resize dataset
   dataset_size = cfg.train_dataset_size if train else cfg.test_dataset_size
   offset = 0 if train else 1
@@ -56,7 +56,7 @@ def process_data(cfg: EConfig, data: Tensor, targets: Tensor, device: torch.devi
 # https://gist.github.com/y0ast/f69966e308e549f013a92dc66debeeb4
 # We need to keep the class name the same as base class methods rely on it
 class MNIST(tv.datasets.MNIST):
-  def __init__(self, cfg: EConfig, device: torch.device, *args, **kwargs):
+  def __init__(self, cfg: HParams, device: torch.device, *args, **kwargs):
     super().__init__(cfg.data_dir, *args, **kwargs)
 
     # Scale data to [0,1]
@@ -72,7 +72,7 @@ class MNIST(tv.datasets.MNIST):
 
 
 class CIFAR10(tv.datasets.CIFAR10):
-  def __init__(self, cfg: EConfig, device: torch.device, *args, **kwargs):
+  def __init__(self, cfg: HParams, device: torch.device, *args, **kwargs):
     super().__init__(cfg.data_dir, *args, **kwargs)
 
     # Scale data to [0,1] floats
@@ -95,7 +95,7 @@ class CIFAR10(tv.datasets.CIFAR10):
 
 
 class CIFAR100(tv.datasets.CIFAR100):
-  def __init__(self, cfg: EConfig, device: torch.device, *args, **kwargs):
+  def __init__(self, cfg: HParams, device: torch.device, *args, **kwargs):
     super().__init__(cfg.data_dir, *args, **kwargs)
 
     # Scale data to [0,1] floats
@@ -118,7 +118,7 @@ class CIFAR100(tv.datasets.CIFAR100):
 
 
 class SVHN(tv.datasets.SVHN):
-  def __init__(self, cfg: EConfig, device: torch.device, *args, **kwargs):
+  def __init__(self, cfg: HParams, device: torch.device, *args, **kwargs):
     super().__init__(cfg.data_dir, *args, **kwargs)
 
     # Scale data to [0,1] floats

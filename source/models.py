@@ -3,7 +3,7 @@ from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .experiment_config import DatasetType, EConfig, ModelType
+from .experiment_config import DatasetType, HParams, ModelType
 
 
 class ExperimentBaseModel(nn.Module):
@@ -14,7 +14,7 @@ class ExperimentBaseModel(nn.Module):
   def forward(self, x) -> Tensor:
     raise NotImplementedError
 
-def get_model_for_config(e_config: EConfig) -> ExperimentBaseModel:
+def get_model_for_config(e_config: HParams) -> ExperimentBaseModel:
   if e_config.model_type == ModelType.DEEP:
     return MLP(e_config.model_depth, e_config.model_width, e_config.dataset_type)
   elif e_config.model_type == ModelType.NIN:

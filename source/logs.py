@@ -7,7 +7,7 @@ import wandb
 from .experiment_config import (
   ComplexityType,
   DatasetSubsetType,
-  EConfig,
+  HParams,
   ETrainingState,
   EvaluationMetrics,
   Verbosity,
@@ -20,7 +20,7 @@ class BaseLogger(object):
 
   def log_batch_end(
     self,
-    cfg: EConfig,
+    cfg: HParams,
     state: ETrainingState,
     cross_entropy: Tensor,
     loss: Tensor,
@@ -43,7 +43,7 @@ class BaseLogger(object):
         **{'complexity/{}'.format(k.name): v for k,v in all_complexities.items()}
       })
   
-  def log_epoch_end(self, cfg: EConfig, state: ETrainingState, datasubset: DatasetSubsetType, avg_loss: float, acc: float) -> None:
+  def log_epoch_end(self, cfg: HParams, state: ETrainingState, datasubset: DatasetSubsetType, avg_loss: float, acc: float) -> None:
     self.log_metrics(
       state.global_batch,
       {
@@ -75,13 +75,13 @@ class Printer(object):
     if self.verbosity >= Verbosity.RUN:
       print('[{}] Training complete in {}s'.format(self.experiment_id, time.time() - self.start_time))
 
-  def batch_end(self, cfg: EConfig, state: ETrainingState, data, loader, loss):
+  def batch_end(self, cfg: HParams, state: ETrainingState, data, loader, loss):
     if self.verbosity >= Verbosity.BATCH and cfg.log_batch_freq is not None and state.batch % cfg.log_batch_freq == 0:
       print('[{}] Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
         state.id, state.epoch, state.batch * len(data), len(loader.dataset), 100. * state.batch / len(loader),
         loss.item()))
 
-  def epoch_metrics(self, cfg: EConfig, state: ETrainingState, epoch: int, train_eval: EvaluationMetrics, val_eval: EvaluationMetrics) -> None:
+  def epoch_metrics(self, cfg: HParams, state: ETrainingState, epoch: int, train_eval: EvaluationMetrics, val_eval: EvaluationMetrics) -> None:
     if self.verbosity >= Verbosity.EPOCH:
       print(
         '[{}][{}][GL: {:.2g} GE: {:.2f}pp][AL: {:.3f} AC: {:.3f}][C: {:.2g} C: {:.2g} T: {:.2g}][{} L: {:.4g}, A: {:.2f}%][{} L: {:.4g}, A: {:.2f}%][CL: {:.4g}]'.format(

@@ -6,18 +6,18 @@ import simple_parsing
 import torch
 
 from source.experiment import Experiment
-from source.experiment_config import EConfig, ETrainingState
+from source.experiment_config import HParams, ETrainingState
 from source.logs import WandbLogger
 
 
 if __name__=='__main__':
   # Prepare experiment settings
   parser = simple_parsing.ArgumentParser()
-  parser.add_arguments(EConfig, dest="config")
+  parser.add_arguments(HParams, dest="config")
   parser.add_arguments(ETrainingState, dest="state")
   
   args = parser.parse_args()
-  cfg: EConfig = args.config
+  cfg: HParams = args.config
   state: ETrainingState = args.state
 
   experiment_id = time.time_ns()
