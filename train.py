@@ -29,7 +29,7 @@ if __name__=='__main__':
   logger = WandbLogger('default', hparams.to_tensorboard_dict(), hparams.wandb_md5)
   def dump_results(epoch, val_eval, train_eval):
     results = {
-      'e_state': state,
+      'state': state,
       'hparams': hparams,
       'final_results_val': val_eval,
       'final_results_train': train_eval,

@@ -23,13 +23,13 @@ from .models import get_model_for_config
 class Experiment:
   def __init__(
     self,
-    e_state: State,
+    state: State,
     device: torch.device,
     hparams: HParams,
     logger: BaseLogger,
     result_save_callback: Optional[object] = None
   ):
-    self.e_state = e_state
+    self.state = state
     self.device = device
     self.hparams = hparams
     
@@ -44,7 +44,7 @@ class Experiment:
     # Logging
     self.logger = logger
     # Printing
-    self.printer = Printer(self.e_state.id, self.hparams.verbosity)
+    self.printer = Printer(self.state.id, self.hparams.verbosity)
     self.result_save_callback = result_save_callback
 
     # Model
@@ -66,7 +66,7 @@ class Experiment:
     checkpoint_file = self.hparams.checkpoint_dir / (self.hparams.md5 + postfix + '.pt')
     torch.save({
       'config': self.hparams,
-      'state': self.e_state,
+      'state': self.state,
       'model': self.model.state_dict(),
       'optimizer': self.optimizer.state_dict(),
       'np_rng': np.random.get_state(),
@@ -78,12 +78,12 @@ class Experiment:
       checkpoint_file = self.hparams.checkpoint_dir / (self.hparams.md5 + '.pt')
       checkpoint = torch.load(checkpoint_file)
       if checkpoint is not None:
-        self.e_state = checkpoint['state']
+        self.state = checkpoint['state']
         self.model.load_state_dict(checkpoint['model'])
         self.optimizer.load_state_dict(checkpoint['optimizer'])
         np.random.set_state(checkpoint['np_rng'])
         torch.set_rng_state(checkpoint['torch_rng'])
-      print(f'loading from checkpoint at epoch {self.e_state.epoch} global batch {self.e_state.global_batch}')
+      print(f'loading from checkpoint at epoch {self.state.epoch} global batch {self.state.global_batch}')
     except FileNotFoundError:
       print('no checkpoint found')
 
@@ -99,14 +99,14 @@ class Experiment:
   
   def _train_epoch(self) -> None:
     self.model.train()
-    ce_check_batches = [(len(self.train_loader)//(2**(self.e_state.ce_check_freq))) * (i+1) for i in range(2**(self.e_state.ce_check_freq)-1)]
+    ce_check_batches = [(len(self.train_loader)//(2**(self.state.ce_check_freq))) * (i+1) for i in range(2**(self.state.ce_check_freq)-1)]
     ce_check_batches.append(len(self.train_loader)-1)
 
     for batch_idx, (data, target) in enumerate(self.train_loader):
       data, target = data.to(self.device, non_blocking=True), target.to(self.device, non_blocking=True)
       
-      self.e_state.batch = batch_idx
-      self.e_state.global_batch = (self.e_state.epoch - 1) * len(self.train_loader) + self.e_state.batch
+      self.state.batch = batch_idx
+      self.state.global_batch = (self.state.epoch - 1) * len(self.train_loader) + self.state.batch
       self.model.train()
       self.optimizer.zero_grad()
       
@@ -121,8 +121,8 @@ class Experiment:
       self.optimizer.step()
 
       # Log everything
-      self.printer.batch_end(self.hparams, self.e_state, data, self.train_loader, loss)
-      self.logger.log_batch_end(self.hparams, self.e_state, cross_entropy, loss)
+      self.printer.batch_end(self.hparams, self.state, data, self.train_loader, loss)
+      self.logger.log_batch_end(self.hparams, self.state, cross_entropy, loss)
 
       # Cross-entropy stopping check
       if batch_idx == ce_check_batches[0]:
@@ -130,44 +130,44 @@ class Experiment:
         is_last_batch = batch_idx == (len(self.train_loader)-1)
         dataset_ce = self.evaluate_cross_entropy(DatasetSubsetType.TRAIN, log=is_last_batch)[0]
         if dataset_ce < self.hparams.ce_target:
-          self.e_state.converged = True
+          self.state.converged = True
         else:
-          while len(self.e_state.ce_check_milestones) > 0 and dataset_ce <= self.e_state.ce_check_milestones[0]:
-            passed_milestone = self.e_state.ce_check_milestones[0]
+          while len(self.state.ce_check_milestones) > 0 and dataset_ce <= self.state.ce_check_milestones[0]:
+            passed_milestone = self.state.ce_check_milestones[0]
             print(f'passed ce milestone {passed_milestone}')
-            self.e_state.ce_check_milestones.pop(0)
-            self.e_state.ce_check_freq += 1
+            self.state.ce_check_milestones.pop(0)
+            self.state.ce_check_freq += 1
             if self.hparams.save_epoch_freq is not None:
               self.save_state(f'_ce_{passed_milestone}')
 
-      if self.e_state.converged:
+      if self.state.converged:
         break
 
   def train(self) -> None:
     self.printer.train_start(self.device)
     train_eval, val_eval = None, None
     
-    self.e_state.global_batch = 0
-    for epoch in trange(self.e_state.epoch, self.hparams.epochs + 1, disable=(not self.hparams.use_tqdm)):
-      self.e_state.epoch = epoch
+    self.state.global_batch = 0
+    for epoch in trange(self.state.epoch, self.hparams.epochs + 1, disable=(not self.hparams.use_tqdm)):
+      self.state.epoch = epoch
       self._train_epoch()
       
       is_evaluation_epoch = (epoch==1 or epoch==self.hparams.epochs or epoch % self.hparams.log_epoch_freq == 0)
-      if is_evaluation_epoch or self.e_state.converged:
-        train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.hparams.epochs or self.e_state.converged))
+      if is_evaluation_epoch or self.state.converged:
+        train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.hparams.epochs or self.state.converged))
         val_eval = self.evaluate(DatasetSubsetType.TEST)
-        self.logger.log_generalization_gap(self.e_state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.all_complexities)
-        self.printer.epoch_metrics(self.hparams, self.e_state, epoch, train_eval, val_eval)
+        self.logger.log_generalization_gap(self.state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.all_complexities)
+        self.printer.epoch_metrics(self.hparams, self.state, epoch, train_eval, val_eval)
       
-      if epoch==self.hparams.epochs or self.e_state.converged:
+      if epoch==self.hparams.epochs or self.state.converged:
         self.result_save_callback(epoch, val_eval, train_eval)
 
       # Save state
-      is_save_epoch = self.hparams.save_epoch_freq is not None and (epoch % self.hparams.save_epoch_freq == 0 or epoch==self.hparams.epochs or self.e_state.converged)
+      is_save_epoch = self.hparams.save_epoch_freq is not None and (epoch % self.hparams.save_epoch_freq == 0 or epoch==self.hparams.epochs or self.state.converged)
       if is_save_epoch:
         self.save_state()
 
-      if self.e_state.converged:
+      if self.state.converged:
         print('Converged')
         break
 
@@ -188,7 +188,7 @@ class Experiment:
     if dataset_subset_type == DatasetSubsetType.TRAIN and compute_all_measures:
       all_complexities = get_all_measures(self.model, self.init_model, data_loader, acc)
 
-    self.logger.log_epoch_end(self.hparams, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
+    self.logger.log_epoch_end(self.hparams, self.state, dataset_subset_type, cross_entropy_loss, acc)
 
     return EvaluationMetrics(acc, cross_entropy_loss, num_correct, len(data_loader.dataset), all_complexities)
 
@@ -215,5 +215,5 @@ class Experiment:
     acc = num_correct.item() / num_to_evaluate_on
     
     if log:
-      self.logger.log_epoch_end(self.hparams, self.e_state, dataset_subset_type, cross_entropy_loss, acc)
+      self.logger.log_epoch_end(self.hparams, self.state, dataset_subset_type, cross_entropy_loss, acc)
     return cross_entropy_loss, acc, num_correct
