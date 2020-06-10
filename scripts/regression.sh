@@ -16,12 +16,14 @@ function parallel {
 
 measures="log_spec_orig_main path_norm_over_margin path_norm param_norm pacbayes_orig pacbayes_mag_orig pacbayes_mag_init pacbayes_mag_flatness pacbayes_init pacbayes_flatness log_sum_of_spec_over_margin log_sum_of_spec log_sum_of_fro_over_margin log_sum_of_fro log_prod_of_spec_over_margin log_prod_of_spec log_prod_of_fro_over_margin log_prod_of_fro inverse_margin fro_over_spec fro_dist dist_spec_init"
 max_jobs=$(nproc)
-steps=10000
-lr=0.005
+steps=500
+lr='1.0'
+optim='sgdm'
 
-envs='all lr width depth train_size'
+envs='all lr width depth dataset train_size'
 exp_types='v1 v2 v3'
-wandb_tag='june5'
+wandb_tag='june10'
+
 
 for exp_type in $exp_types; do
   for env in $envs; do
@@ -33,6 +35,7 @@ for exp_type in $exp_types; do
         --selected_single_measure=$measure \
         --bias=True \
         --lr=$lr \
+        --optim=$optim \
         --steps=$steps \
         --wandb_tag=${wandb_tag}_$exp_type
       done
@@ -43,15 +46,16 @@ for exp_type in $exp_types; do
       --only_bias__ignore_input=True \
       --bias=True \
       --lr=$lr \
+      --optim=$optim \
       --steps=$steps \
       --wandb_tag=${wandb_tag}_$exp_type
     fi
   done
+done
+wait
 
-  wait
-  echo 'done '$exp_type
-
-  wandb sync
-  python results/export_regression_results.py --tag=${wandb_tag}_$exp_type
+wandb sync
+for exp_type in $exp_types; do
+  python results/regression/export_regression_results.py --tag=${wandb_tag}_$exp_type
   python plots/plot_regression_results.py --tag=${wandb_tag}_$exp_type
 done

@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(description='Robust Regression')
 parser.add_argument('--lr', type=float, default=0.0001)
 parser.add_argument('--steps', type=int, default=1)
 
-parser.add_argument('--adam', type=str2bool, default=False)
+parser.add_argument('--optim', type=str, default='sgd')
 parser.add_argument('--rex', type=str2bool, default=False)
 parser.add_argument('--weight_init', type=float, default=0.001)
 
@@ -164,8 +164,10 @@ def estimator(envs, model, seed=99999, model_type="rf", _idx=None, name=None):
     wandb.config.update(flags)
     wandb.config.actual_measure = name
 
-    if flags.adam:
+    if flags.optim == 'adam':
       optimizer = optim.Adam(model.parameters(), lr=flags.lr)
+    elif flags.optim == 'sgdm':
+      optimizer = optim.SGD(model.parameters(), lr=flags.lr, momentum=0.9)
     else:
       optimizer = optim.SGD(model.parameters(), lr=flags.lr)
 
