@@ -103,7 +103,7 @@ for row, env_split in enumerate(['all', 'lr', 'depth', 'width', 'train_size']):
         plt.subplot(rows,22,22*row + i+1)
         x = np.cumsum(np.histogram(data[i][1], points, (0,maxx))[0])
         x = x / x[-1]
-        ax = sns.heatmap(x[..., np.newaxis], cmap="Blues_r", cbar=(i+1)==len(data), cbar_kws={"aspect":35})
+        ax = sns.heatmap(x[..., np.newaxis], cmap="Blues_r", cbar=(i+1)==len(data), cbar_kws={"aspect":35}, rasterized=True)
         ax.invert_yaxis()
         plt.axhline(np.max(data[i][1])*points/maxx, color='black')
         plt.axhline(np.mean(data[i][1])*points/maxx, color='orange')
@@ -119,5 +119,5 @@ for row, env_split in enumerate(['all', 'lr', 'depth', 'width', 'train_size']):
             plt.xlabel(data[i][0].measure, rotation=45, fontsize=8, ha="right")
         else:
             plt.xlabel('')
-plt.savefig(plotpath / f'cdf_{exp_type}.pdf', bbox_inches='tight', rasterize=True)
+plt.savefig(plotpath / f'cdf_{exp_type}.pdf', bbox_inches='tight')
 plt.close()
