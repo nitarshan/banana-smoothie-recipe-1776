@@ -114,6 +114,4 @@ env/
 checkpoints/
 data/*
 !data/nin_adjusted.csv
-results/
-!results/tsvs/
 wandb/
