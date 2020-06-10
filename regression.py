@@ -218,7 +218,7 @@ def estimator(envs, model, seed=99999, model_type="rf", _idx=None, name=None):
                   'bias_grad': model.b.grad.squeeze().cpu().item() if flags.bias else 0.0,
                 })
     wandb.join()
-    np.save(f'results/risks/{flags.selected_single_measure}__{flags.env_split}__{flags.exp_type}__{flags.only_bias__ignore_input}.npy', risks.detach().numpy())
+    np.save(f'results/regression/risks/{flags.selected_single_measure}__{flags.env_split}__{flags.exp_type}__{flags.only_bias__ignore_input}.npy', risks.detach().numpy())
     return model
 
 data_train = [combine_env(data_obs[idx][0]) for idx, _ in enumerate(cms)]

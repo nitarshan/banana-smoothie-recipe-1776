@@ -36,7 +36,7 @@ config_df = pd.DataFrame.from_records(config_list)
 name_df = pd.DataFrame({'name': name_list}) 
 all_df = pd.concat([name_df, config_df,summary_df], axis=1)
 
-resultspath = Path(f'results/')
+resultspath = Path(f'results/regression/')
 resultspath.mkdir(exist_ok=True)
 
 all_df.to_csv(resultspath / f"{tag}_export.csv")

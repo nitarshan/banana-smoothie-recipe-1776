@@ -1,11 +1,12 @@
 # %% Imports
 import argparse
+from collections import namedtuple
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from pathlib import Path
 
 # %% Flags
 parser = argparse.ArgumentParser(description='Export Wandb results')
@@ -72,3 +73,51 @@ for idx, split in enumerate(sorted(df.env_split.unique())):
     plt.xticks(fontsize=8)
     plt.savefig(plotpath / f'{split}_mae_all_vs_baseline.pdf', bbox_inches='tight')
     plt.close()
+
+# %% Plot regression cdfs
+D = namedtuple('D', ['measure', 'env_split', 'exp_type', 'bias_only'])
+
+sns.set()
+exp_type = tag.split('_')[-1]
+rows = 1 if exp_type=='v1' else 5
+plt.figure(figsize=(10,2 * rows))
+sorting = None
+for row, env_split in enumerate(['all', 'lr', 'depth', 'width', 'train_size']):
+    if exp_type=='v1' and env_split != 'all':
+        continue
+    data = [(D(*x.name.split('__')), np.sqrt(np.load(x))) for x in Path('results/regression/risks').glob(f'*__{env_split}__{exp_type}__False.npy')]
+    baseline = [(D(*x.name.split('__')), np.sqrt(np.load(x))) for x in Path('results/regression/risks').glob(f'*__{env_split}__{exp_type}__True.npy')]
+    data[0][0], len(data)
+    if sorting is None:
+        data = sorted(data, key=lambda x: x[1].max())
+        sorting = [x[0] for x in data]
+    else:
+        data_dict = dict(data)
+        data = [(x._replace(env_split=env_split), data_dict[x._replace(env_split=env_split)]) for x in sorting]
+
+    maxx = baseline[0][1].max()
+    points = 100
+    for i in range(len(data)):
+        maxx = max(maxx, data[i][1].max())
+    for i in range(len(data)):
+        plt.subplot(rows,22,22*row + i+1)
+        x = np.cumsum(np.histogram(data[i][1], points, (0,maxx))[0])
+        x = x / x[-1]
+        ax = sns.heatmap(x[..., np.newaxis], cmap="Blues_r", cbar=(i+1)==len(data), cbar_kws={"aspect":35})
+        ax.invert_yaxis()
+        plt.axhline(np.max(data[i][1])*points/maxx, color='black')
+        plt.axhline(np.mean(data[i][1])*points/maxx, color='orange')
+        plt.axhline(baseline[0][1].max()*points/maxx, color='red')
+        plt.ylabel('')
+        if i==0:
+            plt.ylabel(f"RMSE ({env_split.replace('_', ' ')})")
+            plt.yticks([0, points//2, points], labels=[0, str(maxx/2)[:5], str(maxx)[:5]], fontsize=8)
+        else:
+            plt.yticks([])
+        plt.xticks([])
+        if row+1 == rows:
+            plt.xlabel(data[i][0].measure, rotation=45, fontsize=8, ha="right")
+        else:
+            plt.xlabel('')
+plt.savefig(plotpath / f'cdf_{exp_type}.pdf', bbox_inches='tight', rasterize=True)
+plt.close()
