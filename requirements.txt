@@ -5,5 +5,5 @@ scipy==1.4
 torch==1.5
 torchvision==0.6
 tqdm==4.46
-wandb==0.9
+wandb==0.9.1
 simple-parsing==0.0.10
