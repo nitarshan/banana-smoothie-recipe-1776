@@ -24,6 +24,11 @@ envs='all lr width depth dataset train_size'
 exp_types='v1 v2 v3'
 wandb_tag='june10'
 
+if (( $# != 1 ))
+then
+  echo "Missing wandb entity argument"
+  exit 1
+fi
 
 for exp_type in $exp_types; do
   for env in $envs; do
@@ -56,6 +61,6 @@ wait
 
 wandb sync
 for exp_type in $exp_types; do
-  python results/regression/export_regression_results.py --tag=${wandb_tag}_$exp_type
+  python results/regression/export_regression_results.py --tag=${wandb_tag}_$exp_type --wandb_entity=$1
   python plots/plot_regression_results.py --tag=${wandb_tag}_$exp_type
 done
