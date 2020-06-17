@@ -69,7 +69,7 @@ if __name__ == "__main__":
     dataset = argv[1]
     available_datasets = ["cifar10", "svhn"]
     if dataset not in available_datasets + ["all"]:
-        raise ValueError("Invalid dataset specificed.")
+        raise ValueError("Invalid dataset specified.")
     elif dataset == "all":
         datasets = available_datasets
     else:
