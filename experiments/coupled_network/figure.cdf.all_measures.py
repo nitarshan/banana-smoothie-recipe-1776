@@ -8,7 +8,7 @@ from sys import argv
 from common import get_complexity_measures, hoeffding_weight, get_hps, load_data, pretty_measure, sign_error
 
 
-DATA_PATH = "../data/nin_adjusted.csv"
+DATA_PATH = "../../data/nin_adjusted.csv"
 ENVIRONMENT_CACHE_PATH = "./environment_cache"
 
 
