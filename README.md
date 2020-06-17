@@ -9,13 +9,12 @@ Data:
 ├── results
     └── tsvs
         └── ...
-├── scripts
-    ├── ...
-    └── ...
 ├── source
     ├── ...
     └── ...
-├── regression.py
+├── experiments
+    ├── coupled_network
+    └── single_network
 └── train.py
 ```
 
