@@ -160,7 +160,7 @@ class Experiment:
         train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.hparams.epochs or self.state.converged))
         val_eval = self.evaluate(DatasetSubsetType.TEST)
         self.logger.log_generalization_gap(self.state, train_eval.acc, val_eval.acc, train_eval.avg_loss, val_eval.avg_loss, train_eval.all_complexities)
-        self.printer.epoch_metrics(self.hparams, self.state, epoch, train_eval, val_eval)
+        self.printer.epoch_metrics(epoch, train_eval, val_eval)
       
       if epoch==self.hparams.epochs or self.state.converged:
         self.result_save_callback(epoch, val_eval, train_eval)

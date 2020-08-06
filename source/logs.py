@@ -82,14 +82,11 @@ class Printer(object):
         config.id, state.epoch, state.batch * len(data), len(loader.dataset), 100. * state.batch / len(loader),
         loss.item()))
 
-  def epoch_metrics(self, hparams: HParams, state: State, epoch: int, train_eval: EvaluationMetrics, val_eval: EvaluationMetrics) -> None:
+  def epoch_metrics(self, epoch: int, train_eval: EvaluationMetrics, val_eval: EvaluationMetrics) -> None:
     if self.verbosity >= Verbosity.EPOCH:
       print(
-        '[{}][{}][GL: {:.2g} GE: {:.2f}pp][AL: {:.3f} AC: {:.3f}][C: {:.2g} C: {:.2g} T: {:.2g}][{} L: {:.4g}, A: {:.2f}%][{} L: {:.4g}, A: {:.2f}%][CL: {:.4g}]'.format(
+        '[{}][{}][GL: {:.2g} GE: {:.2f}pp][{} L: {:.4g}, A: {:.2f}%][{} L: {:.4g}, A: {:.2f}%]'.format(
           self.experiment_id, epoch,
           train_eval.avg_loss - val_eval.avg_loss, 100. * (train_eval.acc - val_eval.acc),
-          0.0, 0.0,
-          0.0, 0.0, 0.0,
           DatasetSubsetType.TEST.name, val_eval.avg_loss, 100. * val_eval.acc,
-          DatasetSubsetType.TRAIN.name, train_eval.avg_loss, 100. * train_eval.acc,
-          0.0))
+          DatasetSubsetType.TRAIN.name, train_eval.avg_loss, 100. * train_eval.acc))
