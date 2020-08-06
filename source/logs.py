@@ -6,6 +6,7 @@ import wandb
 
 from .experiment_config import (
   ComplexityType,
+  Config,
   DatasetSubsetType,
   HParams,
   State,
@@ -20,12 +21,12 @@ class BaseLogger(object):
 
   def log_batch_end(
     self,
-    hparams: HParams,
+    config: Config,
     state: State,
     cross_entropy: Tensor,
     loss: Tensor,
   ) -> None:
-    if hparams.log_batch_freq is not None and state.global_batch % hparams.log_batch_freq == 0:
+    if config.log_batch_freq is not None and state.global_batch % config.log_batch_freq == 0:
       # Collect metrics for logging
       metrics = {
         'cross_entropy/minibatch': cross_entropy.item(),
@@ -75,8 +76,8 @@ class Printer(object):
     if self.verbosity >= Verbosity.RUN:
       print('[{}] Training complete in {}s'.format(self.experiment_id, time.time() - self.start_time))
 
-  def batch_end(self, hparams: HParams, state: State, data, loader, loss):
-    if self.verbosity >= Verbosity.BATCH and hparams.log_batch_freq is not None and state.batch % hparams.log_batch_freq == 0:
+  def batch_end(self, config: Config, state: State, data, loader, loss):
+    if self.verbosity >= Verbosity.BATCH and config.log_batch_freq is not None and state.batch % config.log_batch_freq == 0:
       print('[{}] Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
         state.id, state.epoch, state.batch * len(data), len(loader.dataset), 100. * state.batch / len(loader),
         loss.item()))

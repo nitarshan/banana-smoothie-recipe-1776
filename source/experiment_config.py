@@ -123,28 +123,6 @@ class HParams:
   # Cross-entropy stopping criterion
   ce_target: Optional[float] = 0.01
   ce_target_milestones: Optional[List[float]] = field(default_factory=lambda: [0.05, 0.025, 0.015])
-  # Visibility (default no visibility)
-  log_batch_freq: Optional[int] = None
-  log_epoch_freq: Optional[int] = 10
-  save_epoch_freq: Optional[int] = 1
-  root_dir: Path = Path('.')
-  data_dir: Path = Path('data')
-  verbosity: Verbosity = Verbosity.EPOCH
-  use_tqdm: bool = False
-
-  # Validation
-  def __post_init__(self):
-    # Set up directories
-    for directory in ('results', 'checkpoints'):
-      (self.root_dir / directory).mkdir(parents=True, exist_ok=True)
-
-  @property
-  def checkpoint_dir(self):
-    return self.root_dir / 'checkpoints'
-  
-  @property
-  def results_dir(self):
-    return self.root_dir / 'results'
 
   def to_tensorboard_dict(self) -> dict:
     d = asdict(self)
@@ -173,6 +151,21 @@ class Config:
   data_dir: Path = Path('data')
   verbosity: Verbosity = Verbosity.EPOCH
   use_tqdm: bool = False
+
+  # Validation
+  def __post_init__(self):
+    # Set up directories
+    for directory in ('results', 'checkpoints'):
+      (self.root_dir / directory).mkdir(parents=True, exist_ok=True)
+    self.data_dir.mkdir(parents=True, exist_ok=True)
+
+  @property
+  def checkpoint_dir(self):
+    return self.root_dir / 'checkpoints'
+  
+  @property
+  def results_dir(self):
+    return self.root_dir / 'results'
 
 class EvaluationMetrics(NamedTuple):
   acc: float

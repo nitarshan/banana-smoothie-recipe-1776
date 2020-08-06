@@ -9,6 +9,7 @@ from tqdm import trange
 
 from .dataset_helpers import get_dataloaders
 from .experiment_config import (
+  Config,
   DatasetSubsetType,
   HParams,
   State,
@@ -26,12 +27,14 @@ class Experiment:
     state: State,
     device: torch.device,
     hparams: HParams,
+    config: Config,
     logger: BaseLogger,
     result_save_callback: Optional[object] = None
   ):
     self.state = state
     self.device = device
     self.hparams = hparams
+    self.config = config
     
     # Random Seeds
     random.seed(self.hparams.seed)
@@ -44,7 +47,7 @@ class Experiment:
     # Logging
     self.logger = logger
     # Printing
-    self.printer = Printer(self.state.id, self.hparams.verbosity)
+    self.printer = Printer(self.state.id, self.config.verbosity)
     self.result_save_callback = result_save_callback
 
     # Model
@@ -57,13 +60,13 @@ class Experiment:
     self.optimizer = self._reset_optimizer()
 
     # Load data
-    self.train_loader, self.train_eval_loader, self.test_loader = get_dataloaders(self.hparams, self.device)
+    self.train_loader, self.train_eval_loader, self.test_loader = get_dataloaders(self.hparams, self.config, self.device)
 
     # Resume from checkpoint if available
     self.load_state()
 
   def save_state(self, postfix: str = '') -> None:
-    checkpoint_file = self.hparams.checkpoint_dir / (self.hparams.md5 + postfix + '.pt')
+    checkpoint_file = self.config.checkpoint_dir / (self.hparams.md5 + postfix + '.pt')
     torch.save({
       'config': self.hparams,
       'state': self.state,
@@ -75,7 +78,7 @@ class Experiment:
 
   def load_state(self) -> None:
     try:
-      checkpoint_file = self.hparams.checkpoint_dir / (self.hparams.md5 + '.pt')
+      checkpoint_file = self.config.checkpoint_dir / (self.hparams.md5 + '.pt')
       checkpoint = torch.load(checkpoint_file)
       if checkpoint is not None:
         self.state = checkpoint['state']
@@ -121,8 +124,8 @@ class Experiment:
       self.optimizer.step()
 
       # Log everything
-      self.printer.batch_end(self.hparams, self.state, data, self.train_loader, loss)
-      self.logger.log_batch_end(self.hparams, self.state, cross_entropy, loss)
+      self.printer.batch_end(self.config, self.state, data, self.train_loader, loss)
+      self.logger.log_batch_end(self.config, self.state, cross_entropy, loss)
 
       # Cross-entropy stopping check
       if batch_idx == ce_check_batches[0]:
@@ -137,7 +140,7 @@ class Experiment:
             print(f'passed ce milestone {passed_milestone}')
             self.state.ce_check_milestones.pop(0)
             self.state.ce_check_freq += 1
-            if self.hparams.save_epoch_freq is not None:
+            if self.config.save_epoch_freq is not None:
               self.save_state(f'_ce_{passed_milestone}')
 
       if self.state.converged:
@@ -148,11 +151,11 @@ class Experiment:
     train_eval, val_eval = None, None
     
     self.state.global_batch = 0
-    for epoch in trange(self.state.epoch, self.hparams.epochs + 1, disable=(not self.hparams.use_tqdm)):
+    for epoch in trange(self.state.epoch, self.hparams.epochs + 1, disable=(not self.config.use_tqdm)):
       self.state.epoch = epoch
       self._train_epoch()
       
-      is_evaluation_epoch = (epoch==1 or epoch==self.hparams.epochs or epoch % self.hparams.log_epoch_freq == 0)
+      is_evaluation_epoch = (epoch==1 or epoch==self.hparams.epochs or epoch % self.config.log_epoch_freq == 0)
       if is_evaluation_epoch or self.state.converged:
         train_eval = self.evaluate(DatasetSubsetType.TRAIN, (epoch==self.hparams.epochs or self.state.converged))
         val_eval = self.evaluate(DatasetSubsetType.TEST)
@@ -163,7 +166,7 @@ class Experiment:
         self.result_save_callback(epoch, val_eval, train_eval)
 
       # Save state
-      is_save_epoch = self.hparams.save_epoch_freq is not None and (epoch % self.hparams.save_epoch_freq == 0 or epoch==self.hparams.epochs or self.state.converged)
+      is_save_epoch = self.config.save_epoch_freq is not None and (epoch % self.config.save_epoch_freq == 0 or epoch==self.hparams.epochs or self.state.converged)
       if is_save_epoch:
         self.save_state()
 

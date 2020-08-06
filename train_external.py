@@ -7,7 +7,7 @@ from typing import Optional, List
 import torch
 
 from source.experiment import Experiment
-from source.experiment_config import DatasetType, HParams, State, ModelType, OptimizerType, Verbosity
+from source.experiment_config import Config, DatasetType, HParams, State, ModelType, OptimizerType, Verbosity
 from source.logs import BaseLogger
 
 
@@ -26,7 +26,8 @@ class Bunch:
         return '\n'.join(str_list)
 
 
-hp: HParams = Bunch(**HParams.__dict__)
+hp: HParams = HParams()
+cfg: Config = Bunch(**Config.__dict__)
 
 # Launch a training run
 def train(
@@ -53,24 +54,20 @@ def train(
   ce_target: Optional[float] = hp.ce_target,
   ce_target_milestones: Optional[List[float]] = [0.05, 0.025, 0.015],
   # Visibility (default no visibility)
-  log_batch_freq: Optional[int] = hp.log_batch_freq,
-  log_epoch_freq: Optional[int] = hp.log_epoch_freq,
-  save_epoch_freq: Optional[int] = hp.save_epoch_freq,
-  root_dir: Path = hp.root_dir,
-  data_dir: Path = hp.data_dir,
-  verbosity: Verbosity = hp.verbosity,
-  use_tqdm: bool = hp.use_tqdm,
+  log_batch_freq: Optional[int] = cfg.log_batch_freq,
+  log_epoch_freq: Optional[int] = cfg.log_epoch_freq,
+  save_epoch_freq: Optional[int] = cfg.save_epoch_freq,
+  root_dir: Path = cfg.root_dir,
+  data_dir: Optional[Path] = None,
+  verbosity: Verbosity = cfg.verbosity,
+  use_tqdm: bool = cfg.use_tqdm,
 ) -> None:
   experiment_id = time.time_ns()
   print('[Experiment {}]'.format(experiment_id))
   print("[Experiment {}] CUDA devices:".format(experiment_id), torch.cuda.device_count())
 
-  root_path = Path(root_dir)
   if data_dir is None:
-    data_path = root_path / 'data'
-    data_path.mkdir(parents=True, exist_ok=True)
-  else:
-    data_path = Path(data_dir)
+    data_dir = root_dir / 'data'
 
   hparams = HParams(
     seed=seed,
@@ -94,7 +91,8 @@ def train(
     # Cross-entropy stopping criterion
     ce_target=ce_target,
     ce_target_milestones=ce_target_milestones,
-    # Visibility (default no visibility)
+  )
+  config = Config(
     log_batch_freq=log_batch_freq,
     log_epoch_freq=log_epoch_freq,
     save_epoch_freq=save_epoch_freq,
@@ -115,9 +113,9 @@ def train(
       'final_results_val': val_eval,
       'final_results_train': train_eval,
     }
-    with open(hparams.results_dir / '{}.epoch{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
+    with open(config.results_dir / '{}.epoch{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
       pickle.dump(results, results_file)
 
   print('[Experiment {}]'.format(experiment_id), hparams)
   device = torch.device('cuda' if use_cuda else 'cpu')
-  Experiment(state, device, hparams, logger, dump_results).train()
+  Experiment(state, device, hparams, config, logger, dump_results).train()

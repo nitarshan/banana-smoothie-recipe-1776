@@ -6,18 +6,20 @@ import simple_parsing
 import torch
 
 from source.experiment import Experiment
-from source.experiment_config import HParams, State
+from source.experiment_config import Config, HParams, State
 from source.logs import WandbLogger
 
 
 if __name__=='__main__':
   # Prepare experiment settings
   parser = simple_parsing.ArgumentParser()
-  parser.add_arguments(HParams, dest="config")
+  parser.add_arguments(HParams, dest="hparams")
+  parser.add_arguments(Config, dest="config")
   parser.add_arguments(State, dest="state")
   
   args = parser.parse_args()
-  hparams: HParams = args.config
+  hparams: HParams = args.hparams
+  config: Config = args.config
   state: State = args.state
 
   experiment_id = time.time_ns()
@@ -34,7 +36,7 @@ if __name__=='__main__':
       'final_results_val': val_eval,
       'final_results_train': train_eval,
     }
-    with open(hparams.results_dir / '{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
+    with open(config.results_dir / '{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
       pickle.dump(results, results_file)
 
-  Experiment(state, device, hparams, logger, dump_results).train()
+  Experiment(state, device, hparams, config, logger, dump_results).train()

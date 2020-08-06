@@ -6,10 +6,10 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 import torchvision as tv
 
-from .experiment_config import DatasetType, HParams
+from .experiment_config import Config, DatasetType, HParams
 
 
-def get_dataloaders(hparams: HParams, device: torch.device) -> Tuple[DataLoader, DataLoader, DataLoader]:
+def get_dataloaders(hparams: HParams, config: Config, device: torch.device) -> Tuple[DataLoader, DataLoader, DataLoader]:
   if hparams.dataset_type == DatasetType.MNIST:
     dataset = MNIST
   elif hparams.dataset_type == DatasetType.CIFAR10:
@@ -23,8 +23,8 @@ def get_dataloaders(hparams: HParams, device: torch.device) -> Tuple[DataLoader,
 
   train_key = {'split': 'train'} if hparams.dataset_type == DatasetType.SVHN else {'train': True}
   test_key = {'split': 'test'} if hparams.dataset_type == DatasetType.SVHN else {'train': False}
-  train = dataset(hparams, device, download=True, **train_key)
-  test = dataset(hparams, device, download=True, **test_key)
+  train = dataset(hparams, config, device, download=True, **train_key)
+  test = dataset(hparams, config, device, download=True, **test_key)
 
   train_loader = DataLoader(train, batch_size=hparams.batch_size, shuffle=True, num_workers=0)
   train_eval_loader = DataLoader(train, batch_size=5000, shuffle=False, num_workers=0)
@@ -56,8 +56,8 @@ def process_data(hparams: HParams, data: Tensor, targets: Tensor, device: torch.
 # https://gist.github.com/y0ast/f69966e308e549f013a92dc66debeeb4
 # We need to keep the class name the same as base class methods rely on it
 class MNIST(tv.datasets.MNIST):
-  def __init__(self, hparams: HParams, device: torch.device, *args, **kwargs):
-    super().__init__(hparams.data_dir, *args, **kwargs)
+  def __init__(self, hparams: HParams, config: Config, device: torch.device, *args, **kwargs):
+    super().__init__(config.data_dir, *args, **kwargs)
 
     # Scale data to [0,1]
     self.data = self.data.unsqueeze(1).float().div(255)
@@ -72,8 +72,8 @@ class MNIST(tv.datasets.MNIST):
 
 
 class CIFAR10(tv.datasets.CIFAR10):
-  def __init__(self, hparams: HParams, device: torch.device, *args, **kwargs):
-    super().__init__(hparams.data_dir, *args, **kwargs)
+  def __init__(self, hparams: HParams, config: Config, device: torch.device, *args, **kwargs):
+    super().__init__(config.data_dir, *args, **kwargs)
 
     # Scale data to [0,1] floats
     self.data = self.data / 255
@@ -95,8 +95,8 @@ class CIFAR10(tv.datasets.CIFAR10):
 
 
 class CIFAR100(tv.datasets.CIFAR100):
-  def __init__(self, hparams: HParams, device: torch.device, *args, **kwargs):
-    super().__init__(hparams.data_dir, *args, **kwargs)
+  def __init__(self, hparams: HParams, config: Config, device: torch.device, *args, **kwargs):
+    super().__init__(config.data_dir, *args, **kwargs)
 
     # Scale data to [0,1] floats
     self.data = self.data / 255
@@ -118,8 +118,8 @@ class CIFAR100(tv.datasets.CIFAR100):
 
 
 class SVHN(tv.datasets.SVHN):
-  def __init__(self, hparams: HParams, device: torch.device, *args, **kwargs):
-    super().__init__(hparams.data_dir, *args, **kwargs)
+  def __init__(self, hparams: HParams, config: Config, device: torch.device, *args, **kwargs):
+    super().__init__(config.data_dir, *args, **kwargs)
 
     # Scale data to [0,1] floats
     self.data = self.data / 255
