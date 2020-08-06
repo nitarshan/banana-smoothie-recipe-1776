@@ -79,7 +79,7 @@ class Printer(object):
   def batch_end(self, config: Config, state: State, data, loader, loss):
     if self.verbosity >= Verbosity.BATCH and config.log_batch_freq is not None and state.batch % config.log_batch_freq == 0:
       print('[{}] Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-        state.id, state.epoch, state.batch * len(data), len(loader.dataset), 100. * state.batch / len(loader),
+        config.id, state.epoch, state.batch * len(data), len(loader.dataset), 100. * state.batch / len(loader),
         loss.item()))
 
   def epoch_metrics(self, hparams: HParams, state: State, epoch: int, train_eval: EvaluationMetrics, val_eval: EvaluationMetrics) -> None:

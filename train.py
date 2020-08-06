@@ -21,9 +21,6 @@ if __name__=='__main__':
   hparams: HParams = args.hparams
   config: Config = args.config
   state: State = args.state
-
-  experiment_id = time.time_ns()
-  state.id = experiment_id
   state.ce_check_milestones = hparams.ce_target_milestones.copy()
 
   # Run experiment
@@ -36,7 +33,7 @@ if __name__=='__main__':
       'final_results_val': val_eval,
       'final_results_train': train_eval,
     }
-    with open(config.results_dir / '{}.pkl'.format(experiment_id, epoch), mode='wb') as results_file:
+    with open(config.results_dir / '{}.pkl'.format(config.id, epoch), mode='wb') as results_file:
       pickle.dump(results, results_file)
 
   Experiment(state, device, hparams, config, logger, dump_results).train()

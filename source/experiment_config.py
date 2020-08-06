@@ -2,6 +2,7 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum, IntEnum
 import hashlib
 from pathlib import Path
+import time
 from typing import Dict, List, NamedTuple, Optional
 
 
@@ -91,7 +92,6 @@ class Verbosity(IntEnum):
 
 @dataclass(frozen=False)
 class State:
-  id: int = 0
   epoch: int = 1
   batch: int = 1
   global_batch: int = 1
@@ -144,6 +144,7 @@ class HParams:
 # Configuration which doesn't affect experiment results
 @dataclass(frozen=True)
 class Config:
+  id: int = field(default_factory=lambda: time.time_ns())
   log_batch_freq: Optional[int] = None
   log_epoch_freq: Optional[int] = 10
   save_epoch_freq: Optional[int] = 1

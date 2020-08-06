@@ -47,7 +47,7 @@ class Experiment:
     # Logging
     self.logger = logger
     # Printing
-    self.printer = Printer(self.state.id, self.config.verbosity)
+    self.printer = Printer(self.config.id, self.config.verbosity)
     self.result_save_callback = result_save_callback
 
     # Model
