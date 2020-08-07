@@ -249,7 +249,7 @@ def get_all_measures(
       measures[CT.PACBAYES_MAG_FLATNESS] = torch.tensor(1 / mag_sigma ** 2)
     
     # Margin measures
-    margin = _margin(model, dataloader)
+    margin = _margin(model, dataloader).abs()
     measures[CT.INVERSE_MARGIN] = torch.tensor(1).to(device) / margin ** 2
     measures[CT.LOG_PROD_OF_FRO_OVER_MARGIN] = measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log()
     measures[CT.LOG_SUM_OF_FRO_OVER_MARGIN] = np.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log())
