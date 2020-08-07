@@ -199,6 +199,7 @@ def get_all_measures(
   measures = {}
 
   model = deepcopy(model)
+  init_model = deepcopy(init_model)
   if use_reparam:
     reparam(model)
     reparam(init_model)
