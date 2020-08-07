@@ -119,7 +119,7 @@ def _margin(
   return torch.cat(margins).kthvalue(m // 10)[0]
 
 # https://github.com/bneyshabur/generalization-bounds/blob/master/measures.py
-def _path_norm_observ(model: ExperimentBaseModel) -> Tensor:
+def _path_norm(model: ExperimentBaseModel) -> Tensor:
   device = next(model.parameters()).device
   model = deepcopy(model)
   model.eval()
@@ -129,13 +129,6 @@ def _path_norm_observ(model: ExperimentBaseModel) -> Tensor:
   x = torch.ones([1] + list(model.dataset_type.D), device=device)
   x = model(x)
   del model
-  return x.sum().sqrt()
-
-def _path_norm_interv(model: ExperimentBaseModel) -> Tensor:
-  device = next(model.parameters()).device
-  model.eval()
-  x = torch.ones([1] + list(model.dataset_type.D), device=device)
-  x = model(x)
   return x.sum().sqrt()
 
 def _param_count(model: ExperimentBaseModel) -> int:
@@ -221,7 +214,7 @@ def get_all_measures(
   measures[CT.LOG_PROD_OF_FRO] = _log_prod_of_fro(weights_only)
   measures[CT.LOG_SUM_OF_FRO] = np.log(d) + (1/d) * measures[CT.LOG_PROD_OF_FRO]
   measures[CT.PARAM_NORM] = _param_norm(weights_only)
-  measures[CT.PATH_NORM] = _path_norm_observ(model)
+  measures[CT.PATH_NORM] = _path_norm(model)
   measures[CT.PARAMS] = torch.tensor(_param_count(model))
   measures[CT.LOG_PROD_OF_SPEC] = _log_spec_norm(weights_only)
   measures[CT.LOG_SUM_OF_SPEC] = np.log(d) + (1/d) * measures[CT.LOG_PROD_OF_SPEC]
@@ -255,7 +248,7 @@ def get_all_measures(
     measures[CT.LOG_SUM_OF_FRO_OVER_MARGIN] = np.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log())
     measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN] = measures[CT.LOG_PROD_OF_SPEC] - 2 * margin.log()
     measures[CT.LOG_SUM_OF_SPEC_OVER_MARGIN] = np.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_SPEC] -  2 * margin.log())
-    measures[CT.PATH_NORM_OVER_MARGIN] = _path_norm_observ(model) / margin ** 2
+    measures[CT.PATH_NORM_OVER_MARGIN] = measures[CT.PATH_NORM] / margin ** 2
 
   measures = {k: v.item() for k, v in measures.items()}
   return measures
