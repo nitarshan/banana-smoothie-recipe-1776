@@ -20,6 +20,7 @@ if __name__=='__main__':
   args = parser.parse_args()
   hparams: HParams = args.hparams
   config: Config = args.config
+  config.setup_dirs()
   state: State = args.state
   state.ce_check_milestones = hparams.ce_target_milestones.copy()
 

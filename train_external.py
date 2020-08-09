@@ -11,23 +11,8 @@ from source.experiment_config import Config, DatasetType, HParams, State, ModelT
 from source.logs import BaseLogger
 
 
-# A class that enables dot access for a dictionary.
-class Bunch:
-    def __init__(self, **kwargs):
-        self.__dict__ = kwargs
-
-    def to_dict(self):
-        return self.__dict__
-
-    def fancy_print(self, prefix=''):
-        str_list = []
-        for key, val in self.__dict__.items():
-            str_list.append(prefix + "%s = %s" % (key, val))
-        return '\n'.join(str_list)
-
-
 hp: HParams = HParams()
-cfg: Config = Bunch(**Config.__dict__)
+cfg: Config = Config()
 
 # Launch a training run
 def train(
@@ -101,6 +86,7 @@ def train(
     verbosity=verbosity,
     use_tqdm=use_tqdm,
   )
+  config.setup_dirs()
   state = State(
     ce_check_milestones=ce_target_milestones,
   )

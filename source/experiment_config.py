@@ -153,8 +153,7 @@ class Config:
   verbosity: Verbosity = Verbosity.EPOCH
   use_tqdm: bool = False
 
-  # Validation
-  def __post_init__(self):
+  def setup_dirs(self) -> None:
     # Set up directories
     for directory in ('results', 'checkpoints'):
       (self.root_dir / directory).mkdir(parents=True, exist_ok=True)
