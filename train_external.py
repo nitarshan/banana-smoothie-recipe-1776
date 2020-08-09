@@ -20,12 +20,12 @@ def train(
   seed: int = hp.seed,
   use_cuda: bool = hp.use_cuda,
   # Model
-  model_type: ModelType = hp.model_type,
+  model_type: str = hp.model_type.name,
   model_depth: int = hp.model_depth,
   model_width: int = hp.model_width,
   base_width: int = hp.base_width,
   # Dataset
-  dataset_type: DatasetType = hp.dataset_type,
+  dataset_type: str = hp.dataset_type.name,
   data_seed: Optional[int] = hp.data_seed,
   train_dataset_size: Optional[int] = hp.train_dataset_size,
   test_dataset_size: Optional[int] = hp.test_dataset_size,
@@ -33,7 +33,7 @@ def train(
   # Training
   batch_size: int = hp.batch_size,
   epochs: int = hp.epochs,
-  optimizer_type: OptimizerType = hp.optimizer_type,
+  optimizer_type: str = hp.optimizer_type.name,
   lr: float = hp.lr,
   # Cross-entropy stopping criterion
   ce_target: Optional[float] = hp.ce_target,
@@ -44,7 +44,7 @@ def train(
   save_epoch_freq: Optional[int] = cfg.save_epoch_freq,
   root_dir: Path = cfg.root_dir,
   data_dir: Optional[Path] = None,
-  verbosity: Verbosity = cfg.verbosity,
+  verbosity: str = cfg.verbosity.name,
   use_tqdm: bool = cfg.use_tqdm,
 ) -> None:
   experiment_id = time.time_ns()
@@ -58,12 +58,12 @@ def train(
     seed=seed,
     use_cuda=use_cuda,
     # Model
-    model_type=model_type,
+    model_type=ModelType[model_type],
     model_depth=model_depth,
     model_width=model_width,
     base_width=base_width,
     # Dataset
-    dataset_type=dataset_type,
+    dataset_type=DatasetType[dataset_type],
     data_seed=data_seed,
     train_dataset_size=train_dataset_size,
     test_dataset_size=test_dataset_size,
@@ -71,7 +71,7 @@ def train(
     # Training
     batch_size=batch_size,
     epochs=epochs,
-    optimizer_type=optimizer_type,
+    optimizer_type=OptimizerType[optimizer_type],
     lr=lr,
     # Cross-entropy stopping criterion
     ce_target=ce_target,
@@ -83,7 +83,7 @@ def train(
     save_epoch_freq=save_epoch_freq,
     root_dir=root_dir,
     data_dir=data_dir,
-    verbosity=verbosity,
+    verbosity=Verbosity[verbosity],
     use_tqdm=use_tqdm,
   )
   config.setup_dirs()
