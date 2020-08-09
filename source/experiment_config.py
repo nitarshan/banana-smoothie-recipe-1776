@@ -3,7 +3,7 @@ from enum import Enum, IntEnum
 import hashlib
 from pathlib import Path
 import time
-from typing import Dict, List, NamedTuple, Optional
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 
 class DatasetType(Enum):
@@ -12,7 +12,7 @@ class DatasetType(Enum):
   CIFAR100 = (3, (3, 32, 32), 100)
   SVHN = (4, (3, 32, 32), 10)
   
-  def __init__(self, id, image_shape, num_classes):
+  def __init__(self, id: int, image_shape: Tuple[int, int, int], num_classes: int):
     self.D = image_shape
     self.K = num_classes
 
@@ -25,31 +25,38 @@ class ModelType(Enum):
   NIN = 2
 
 class ComplexityType(Enum):
-  NONE = 1
-  L2 = 2
-  LOG_PROD_OF_FRO = 3
-  LOG_SUM_OF_FRO = 4
-  PARAM_NORM = 5
-  PATH_NORM = 6
-  PARAMS = 7
-  LOG_PROD_OF_SPEC = 8
-  LOG_SUM_OF_SPEC = 9
-  FRO_DIST = 10
-  PACBAYES_ORIG = 11
-  PACBAYES_INIT = 12
-  PACBAYES_MAG_ORIG = 13
-  PACBAYES_MAG_INIT = 14
-  PACBAYES_FLATNESS = 15
-  PACBAYES_MAG_FLATNESS = 16
-  FRO_OVER_SPEC = 17
-  DIST_SPEC_INIT = 18
-  INVERSE_MARGIN = 19
-  LOG_PROD_OF_FRO_OVER_MARGIN = 20
-  LOG_SUM_OF_FRO_OVER_MARGIN = 21
-  LOG_PROD_OF_SPEC_OVER_MARGIN = 22
-  LOG_SUM_OF_SPEC_OVER_MARGIN = 23
-  PATH_NORM_OVER_MARGIN = 24
-  L2_DIST = 25
+  # Measures from Fantastic Generalization Measures
+  PARAMS = 20
+  INVERSE_MARGIN = 22
+  LOG_PROD_OF_SPEC = 32
+  LOG_PROD_OF_SPEC_OVER_MARGIN = 31
+  FRO_OVER_SPEC = 33
+  LOG_SUM_OF_SPEC_OVER_MARGIN = 34
+  LOG_SUM_OF_SPEC = 35
+  LOG_PROD_OF_FRO = 37
+  LOG_PROD_OF_FRO_OVER_MARGIN = 36
+  LOG_SUM_OF_FRO_OVER_MARGIN = 38
+  LOG_SUM_OF_FRO = 39
+  FRO_DIST = 40
+  DIST_SPEC_INIT = 41
+  PARAM_NORM = 42
+  PATH_NORM = 44
+  PATH_NORM_OVER_MARGIN = 43
+  PACBAYES_INIT = 48
+  PACBAYES_ORIG = 49
+  PACBAYES_FLATNESS = 53
+  PACBAYES_MAG_INIT = 56
+  PACBAYES_MAG_ORIG = 57
+  PACBAYES_MAG_FLATNESS = 61
+  # Other Measures
+  L2 = 100
+  L2_DIST = 101
+  LOG_PROD_OF_SPEC_FFT = 132
+  LOG_PROD_OF_SPEC_OVER_MARGIN_FFT = 131
+  FRO_OVER_SPEC_FFT = 133
+  LOG_SUM_OF_SPEC_OVER_MARGIN_FFT = 134
+  LOG_SUM_OF_SPEC_FFT = 135
+  DIST_SPEC_INIT_FFT = 141
 
   @classmethod
   def data_dependent_measures(cls):
