@@ -141,8 +141,7 @@ def _l2_dist(weights_only: List[Tensor], init_weights_only: List[Tensor]) -> Ten
   return get_flat_params([(p - q) for p, q in zip(weights_only, init_weights_only)]).norm(p=2)
 
 def _log_prod_of_fro(weights_only: List[Tensor]) -> Tensor:
-  ret = get_parameter_norms(weights_only, 'fro').log().sum()
-  return ret
+  return get_parameter_norms(weights_only, 'fro').log().sum()
 
 def _param_norm(weights_only: List[Tensor]) -> Tensor:
   return get_parameter_norms(weights_only, 'fro').sum()
@@ -192,8 +191,9 @@ def _pacbayes_mag_bound(
 def get_all_measures(
   model: ExperimentBaseModel,
   init_model: ExperimentBaseModel,
-  dataloader: Optional[DataLoader] = None,
-  acc: Optional[float] = None,
+  dataloader: DataLoader,
+  acc: float,
+  *,
   use_reparam: bool = True,
 ) -> Dict[CT, float]:
   measures = {}
@@ -223,33 +223,30 @@ def get_all_measures(
   measures[CT.FRO_OVER_SPEC] = _fro_over_spec(weights_only, init_weights_only)
   measures[CT.DIST_SPEC_INIT] = _spec_dist(weights_only, init_weights_only)
 
-  # Data dependent measures
-  if dataloader is not None:
-    # Sharpness measures
-    if acc is not None:
-      m = len(dataloader.dataset)
-      omega = _param_count(model)
+  # Sharpness measures
+  m = len(dataloader.dataset)
+  omega = _param_count(model)
 
-      eps = None
-      sigma = _pacbayes_sigma(model, dataloader, acc, eps)
-      measures[CT.PACBAYES_ORIG] = _pacbayes_bound(measures[CT.L2], sigma, m)
-      measures[CT.PACBAYES_INIT] = _pacbayes_bound(measures[CT.L2_DIST], sigma, m)
-      measures[CT.PACBAYES_FLATNESS] = torch.tensor(1 / sigma ** 2)
-      
-      mag_eps = 1e-3
-      mag_sigma = _pacbayes_sigma(model, dataloader, acc, mag_eps)
-      measures[CT.PACBAYES_MAG_ORIG] = _pacbayes_mag_bound(mag_sigma, mag_eps, omega, m, weights_only, init_weights_only, True)
-      measures[CT.PACBAYES_MAG_INIT] = _pacbayes_mag_bound(mag_sigma, mag_eps, omega, m, weights_only, init_weights_only, False)
-      measures[CT.PACBAYES_MAG_FLATNESS] = torch.tensor(1 / mag_sigma ** 2)
-    
-    # Margin measures
-    margin = _margin(model, dataloader).abs()
-    measures[CT.INVERSE_MARGIN] = torch.tensor(1).to(device) / margin ** 2
-    measures[CT.LOG_PROD_OF_FRO_OVER_MARGIN] = measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log()
-    measures[CT.LOG_SUM_OF_FRO_OVER_MARGIN] = np.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log())
-    measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN] = measures[CT.LOG_PROD_OF_SPEC] - 2 * margin.log()
-    measures[CT.LOG_SUM_OF_SPEC_OVER_MARGIN] = np.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_SPEC] -  2 * margin.log())
-    measures[CT.PATH_NORM_OVER_MARGIN] = measures[CT.PATH_NORM] / margin ** 2
+  eps = None
+  sigma = _pacbayes_sigma(model, dataloader, acc, eps)
+  measures[CT.PACBAYES_ORIG] = _pacbayes_bound(measures[CT.L2], sigma, m)
+  measures[CT.PACBAYES_INIT] = _pacbayes_bound(measures[CT.L2_DIST], sigma, m)
+  measures[CT.PACBAYES_FLATNESS] = torch.tensor(1 / sigma ** 2)
+  
+  mag_eps = 1e-3
+  mag_sigma = _pacbayes_sigma(model, dataloader, acc, mag_eps)
+  measures[CT.PACBAYES_MAG_ORIG] = _pacbayes_mag_bound(mag_sigma, mag_eps, omega, m, weights_only, init_weights_only, True)
+  measures[CT.PACBAYES_MAG_INIT] = _pacbayes_mag_bound(mag_sigma, mag_eps, omega, m, weights_only, init_weights_only, False)
+  measures[CT.PACBAYES_MAG_FLATNESS] = torch.tensor(1 / mag_sigma ** 2)
+  
+  # Margin measures
+  margin = _margin(model, dataloader).abs()
+  measures[CT.INVERSE_MARGIN] = torch.tensor(1).to(device) / margin ** 2
+  measures[CT.LOG_PROD_OF_FRO_OVER_MARGIN] = measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log()
+  measures[CT.LOG_SUM_OF_FRO_OVER_MARGIN] = np.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_FRO] -  2 * margin.log())
+  measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN] = measures[CT.LOG_PROD_OF_SPEC] - 2 * margin.log()
+  measures[CT.LOG_SUM_OF_SPEC_OVER_MARGIN] = np.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_SPEC] -  2 * margin.log())
+  measures[CT.PATH_NORM_OVER_MARGIN] = measures[CT.PATH_NORM] / margin ** 2
 
   measures = {k: v.item() for k, v in measures.items()}
   return measures
