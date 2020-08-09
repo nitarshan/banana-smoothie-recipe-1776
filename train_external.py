@@ -102,7 +102,6 @@ def train(
     use_tqdm=use_tqdm,
   )
   state = State(
-    id=experiment_id,
     ce_check_milestones=ce_target_milestones,
   )
 
