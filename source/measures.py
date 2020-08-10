@@ -39,13 +39,14 @@ def _reparam(model):
 def _perturbed_model(
   model: ExperimentBaseModel,
   sigma: float,
+  rng,
   magnitude_eps: Optional[float] = None
 ):
   device = next(model.parameters()).device
   if magnitude_eps is not None:
-    noise = [torch.normal(0,sigma**2 * torch.abs(p) ** 2 + magnitude_eps ** 2).to(device) for p in model.parameters()]
+    noise = [torch.normal(0,sigma**2 * torch.abs(p) ** 2 + magnitude_eps ** 2, generator=rng) for p in model.parameters()]
   else:
-    noise = [torch.normal(0,sigma**2,p.shape).to(device) for p in model.parameters()]
+    noise = [torch.normal(0,sigma**2,p.shape, generator=rng).to(device) for p in model.parameters()]
   model = deepcopy(model)
   try:
     [p.add_(n) for p,n in zip(model.parameters(), noise)]
@@ -60,6 +61,7 @@ def _pacbayes_sigma(
   model: ExperimentBaseModel,
   dataloader: DataLoader,
   accuracy: float,
+  seed: int,
   magnitude_eps: Optional[float] = None,
   search_depth: int = 15,
   montecarlo_samples: int = 10,
@@ -69,11 +71,16 @@ def _pacbayes_sigma(
   lower, upper = 0, 2
   sigma = 1
 
+  BIG_NUMBER = 10348628753
+  device = next(model.parameters()).device
+  rng = torch.Generator(device=device) if magnitude_eps is not None else torch.Generator()
+  rng.manual_seed(BIG_NUMBER + seed)
+
   for _ in range(search_depth):
     sigma = (lower + upper) / 2
     accuracy_samples = []
     for _ in range(montecarlo_samples):
-      with _perturbed_model(model, sigma, magnitude_eps) as p_model:
+      with _perturbed_model(model, sigma, rng, magnitude_eps) as p_model:
         loss_estimate = 0
         for data, target in dataloader:
           logits = p_model(data)
@@ -100,6 +107,7 @@ def get_all_measures(
   init_model: ExperimentBaseModel,
   dataloader: DataLoader,
   acc: float,
+  seed: int,
 ) -> Dict[CT, float]:
   measures = {}
 
@@ -227,7 +235,7 @@ def get_all_measures(
   measures[CT.LOG_SPEC_ORIG_MAIN_FFT] = measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN_FFT] + measures[CT.FRO_OVER_SPEC_FFT].log() # 30
 
   print("Flatness-based measures")
-  sigma = _pacbayes_sigma(model, dataloader, acc)
+  sigma = _pacbayes_sigma(model, dataloader, acc, seed)
   def _pacbayes_bound(reference_vec: Tensor) -> Tensor:
     return (reference_vec.norm(p=2) ** 2) / (4 * sigma ** 2) + math.log(m / sigma) + 10
   measures[CT.PACBAYES_INIT] = _pacbayes_bound(dist_w_vec) # 48
@@ -236,7 +244,7 @@ def get_all_measures(
   
   print("Magnitude-aware Perturbation Bounds")
   mag_eps = 1e-3
-  mag_sigma = _pacbayes_sigma(model, dataloader, acc, mag_eps)
+  mag_sigma = _pacbayes_sigma(model, dataloader, acc, seed, mag_eps)
   omega = num_params
   def _pacbayes_mag_bound(reference_vec: Tensor) -> Tensor:
     numerator = mag_eps ** 2 + (mag_sigma ** 2 + 1) * (reference_vec.norm(p=2)**2) / omega
