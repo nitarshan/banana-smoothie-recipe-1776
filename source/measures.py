@@ -225,9 +225,8 @@ def get_all_measures(
   print("Flatness-based measures")
   m = len(dataloader.dataset)
   sigma = _pacbayes_sigma(model, dataloader, acc)
-  def _pacbayes_bound(reference: Tensor) -> Tensor:
-    weight_norm = reference.norm(p=2) ** 2
-    return (weight_norm ** 2) / (4 * sigma ** 2) + math.log(m / sigma) + 10
+  def _pacbayes_bound(reference_vec: Tensor) -> Tensor:
+    return (reference_vec.norm(p=2) ** 2) / (4 * sigma ** 2) + math.log(m / sigma) + 10
   measures[CT.PACBAYES_INIT] = _pacbayes_bound(dist_w_vec) # 48
   measures[CT.PACBAYES_ORIG] = _pacbayes_bound(w_vec) # 49
   measures[CT.PACBAYES_FLATNESS] = torch.tensor(1 / sigma ** 2) # 53
@@ -236,9 +235,8 @@ def get_all_measures(
   mag_eps = 1e-3
   mag_sigma = _pacbayes_sigma(model, dataloader, acc, mag_eps)
   omega = num_params
-  def _pacbayes_mag_bound(reference: Tensor) -> Tensor:
-    weight_norm = reference.norm(p=2) ** 2
-    numerator = mag_eps ** 2 + (mag_sigma ** 2 + 1) * weight_norm / omega
+  def _pacbayes_mag_bound(reference_vec: Tensor) -> Tensor:
+    numerator = mag_eps ** 2 + (mag_sigma ** 2 + 1) * (reference_vec.norm(p=2)**2) / omega
     denominator = mag_eps ** 2 + mag_sigma ** 2 * dist_w_vec ** 2
     return 1/4 * (numerator / denominator).log().sum() + math.log(m / mag_sigma) + 10
   measures[CT.PACBAYES_MAG_INIT] = _pacbayes_mag_bound(dist_w_vec) # 56
