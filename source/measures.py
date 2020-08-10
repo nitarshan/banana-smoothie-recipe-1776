@@ -107,7 +107,7 @@ def get_all_measures(
   init_model = _reparam(init_model)
 
   device = next(model.parameters()).device
-  num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+  m = len(dataloader.dataset)
 
   def get_weights_only(model: ExperimentBaseModel) -> List[Tensor]:
     blacklist = {'bias', 'bn'}
@@ -122,6 +122,7 @@ def get_all_measures(
 
   w_vec = get_vec_params(weights)
   dist_w_vec = get_vec_params(dist_init_weights)
+  num_params = len(w_vec)
 
   def get_reshaped_weights(weights: List[Tensor]) -> List[Tensor]:
     # If the weight is a tensor (e.g. a 4D Conv2d weight), it will be reshaped to a 2D matrix
@@ -143,7 +144,6 @@ def get_all_measures(
     dataloader: DataLoader
   ) -> Tensor:
     margins = []
-    m = len(dataloader.dataset)
     for data, target in dataloader:
       logits = model(data)
       correct_logit = logits[torch.arange(logits.shape[0]), target].clone()
@@ -159,13 +159,17 @@ def get_all_measures(
   print("(Norm & Margin)-Based Measures")
   fro_norms = torch.cat([p.norm('fro').unsqueeze(0) ** 2 for p in reshaped_weights])
   spec_norms = torch.cat([p.svd().S.max().unsqueeze(0) ** 2 for p in reshaped_weights])
+  dist_fro_norms = torch.cat([p.norm('fro').unsqueeze(0) ** 2 for p in dist_reshaped_weights])
+  dist_spec_norms = torch.cat([p.svd().S.max().unsqueeze(0) ** 2 for p in dist_reshaped_weights])
 
   print("Approximate Spectral Norm")
-  # Note that spec_norms uses an approximation from [Yoshida and Miyato, 2017]
+  # Note that these use an approximation from [Yoshida and Miyato, 2017]
   # https://arxiv.org/abs/1705.10941 (Section 3.2, Convolutions)
   measures[CT.LOG_PROD_OF_SPEC] = spec_norms.log().sum() # 32
   measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN] = measures[CT.LOG_PROD_OF_SPEC] - 2 * margin.log() # 31
+  measures[CT.LOG_SPEC_INIT_MAIN] = measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN] + (dist_fro_norms / spec_norms).sum().log() # 29
   measures[CT.FRO_OVER_SPEC] = (fro_norms / spec_norms).sum() # 33
+  measures[CT.LOG_SPEC_ORIG_MAIN] = measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN] + measures[CT.FRO_OVER_SPEC].log() # 30
   measures[CT.LOG_SUM_OF_SPEC_OVER_MARGIN] = math.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_SPEC] -  2 * margin.log()) # 34
   measures[CT.LOG_SUM_OF_SPEC] = math.log(d) + (1/d) * measures[CT.LOG_PROD_OF_SPEC] # 35
 
@@ -176,8 +180,6 @@ def get_all_measures(
   measures[CT.LOG_SUM_OF_FRO] = math.log(d) + (1/d) * measures[CT.LOG_PROD_OF_FRO] # 39
 
   print("Distance to Initialization")
-  dist_fro_norms = torch.cat([p.norm('fro').unsqueeze(0) ** 2 for p in dist_reshaped_weights])
-  dist_spec_norms = torch.cat([p.svd().S.max().unsqueeze(0) ** 2 for p in dist_reshaped_weights])
   measures[CT.FRO_DIST] = dist_fro_norms.sum() # 40
   measures[CT.DIST_SPEC_INIT] = dist_spec_norms.sum() # 41
   measures[CT.PARAM_NORM] = fro_norms.sum() # 42
@@ -221,9 +223,10 @@ def get_all_measures(
   measures[CT.LOG_SUM_OF_SPEC_OVER_MARGIN_FFT] = math.log(d) + (1/d) * (measures[CT.LOG_PROD_OF_SPEC_FFT] -  2 * margin.log()) # 34
   measures[CT.LOG_SUM_OF_SPEC_FFT] = math.log(d) + (1/d) * measures[CT.LOG_PROD_OF_SPEC_FFT] # 35
   measures[CT.DIST_SPEC_INIT_FFT] = fft_dist_spec_norms.sum() # 41
+  measures[CT.LOG_SPEC_INIT_MAIN_FFT] = measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN_FFT] + (dist_fro_norms / fft_spec_norms).sum().log() # 29
+  measures[CT.LOG_SPEC_ORIG_MAIN_FFT] = measures[CT.LOG_PROD_OF_SPEC_OVER_MARGIN_FFT] + measures[CT.FRO_OVER_SPEC_FFT].log() # 30
 
   print("Flatness-based measures")
-  m = len(dataloader.dataset)
   sigma = _pacbayes_sigma(model, dataloader, acc)
   def _pacbayes_bound(reference_vec: Tensor) -> Tensor:
     return (reference_vec.norm(p=2) ** 2) / (4 * sigma ** 2) + math.log(m / sigma) + 10
