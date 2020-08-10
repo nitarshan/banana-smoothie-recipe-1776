@@ -61,8 +61,8 @@ def _pacbayes_sigma(
   dataloader: DataLoader,
   accuracy: float,
   magnitude_eps: Optional[float] = None,
-  search_depth: int = 10,
-  montecarlo_samples: int = 3,
+  search_depth: int = 15,
+  montecarlo_samples: int = 10,
   accuracy_displacement: float = 0.1,
   displacement_tolerance: float = 1e-2,
 ) -> float:
