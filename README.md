@@ -27,11 +27,8 @@ conda activate rgm
 
 ### Venv
 ```bash
-sudo apt-get update
-sudo apt-get upgrade
-sudo apt-get install build-essential python3.8 python3.8-dev python3.8-distutils python3.8-venv
-python3.8 -m venv env
+python3 -m venv env
 source env/bin/activate
-python3.8 -m pip install -U pip
-python3.8 -m pip install -r requirements.txt
+python -m pip install -U pip
+python -m pip install -r requirements.txt
 ```
