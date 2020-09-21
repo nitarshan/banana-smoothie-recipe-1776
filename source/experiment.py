@@ -71,6 +71,7 @@ class Experiment:
       'config': self.hparams,
       'state': self.state,
       'model': self.model.state_dict(),
+      'init_model': self.init_model.state_dict(),
       'optimizer': self.optimizer.state_dict(),
       'np_rng': np.random.get_state(),
       'torch_rng': torch.get_rng_state(),
