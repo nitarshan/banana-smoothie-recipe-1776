@@ -254,4 +254,10 @@ def get_all_measures(
   measures[CT.PACBAYES_MAG_ORIG] = _pacbayes_mag_bound(w_vec) # 57
   measures[CT.PACBAYES_MAG_FLATNESS] = torch.tensor(1 / mag_sigma ** 2) # 61
 
-  return {k: v.item() for k, v in measures.items()}
+  # Adjust for dataset size
+  def adjust_measure(measure: CT, value: float) -> float:
+    if measure.name.startswith('LOG_'):
+      return 0.5 * (value - np.log(m))
+    else:
+      return np.sqrt(value / m)
+  return {k: adjust_measure(k, v.item()) for k, v in measures.items()}
