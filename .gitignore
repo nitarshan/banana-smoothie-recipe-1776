@@ -112,6 +112,4 @@ venv.bak/
 # Project
 env/
 checkpoints/
-data/*
-!data/nin_adjusted.csv
 wandb/

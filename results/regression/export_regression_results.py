@@ -7,15 +7,15 @@ import wandb
 # %% Flags
 parser = argparse.ArgumentParser(description='Export Wandb results')
 parser.add_argument('--tag', type=str)
-parser.add_argument('--wandb_entity', type=str)
+parser.add_argument('--entity', type=str)
 flags = parser.parse_args()
 tag = flags.tag
-entity = flags.wandb_entity
+entity = flags.entity
 
 # %% Wandb connection
 # https://docs.wandb.com/library/api/examples#export-metrics-from-all-runs-in-a-project-to-a-csv-file
 api = wandb.Api()
-runs = api.runs(f"{entity}/rgm_irm", {"config.wandb_tag": tag})
+runs = api.runs(f"{entity}/rgm_single", {"config.wandb_tag": tag})
 print(f"Found {len(runs)} runs for tag {tag}")
 
 summary_list = [] 

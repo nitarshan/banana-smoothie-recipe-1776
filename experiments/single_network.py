@@ -34,14 +34,14 @@ parser.add_argument('--selected_single_measure', type=str, default="path_norm")
 parser.add_argument('--env_split', type=str, default="all")
 parser.add_argument('--exp_type', type=str, default="v1")
 parser.add_argument('--wandb_tag', type=str, default="default")
-parser.add_argument('--datafile', type=str, default='nin_adjusted')
+parser.add_argument('--datafile', type=str, default='nin.cifar10_svhn')
 parser.add_argument('--dataset', type=str, default=None)
 parser.add_argument('--datasize', type=int, default=None)
 
 flags = parser.parse_args()
 
 
-df_ob = pd.read_csv(f'data/{flags.datafile}.csv').replace([np.inf, -np.inf], np.nan).dropna()
+df_ob = pd.read_csv(f'results/{flags.datafile}.csv').replace([np.inf, -np.inf], np.nan).dropna()
 if flags.dataset is not None:
   assert flags.dataset in df_ob['hp.dataset'].unique()
   df_ob = df_ob[df_ob['hp.dataset']==flags.dataset]
@@ -52,8 +52,8 @@ if flags.datasize is not None:
 
 BLACKLISTED_MEASURES = set([x for x in df_ob.columns if x.startswith('complexity')])
 measure = f"complexity.{flags.selected_single_measure}"
-if f"{measure}_adjusted1" in BLACKLISTED_MEASURES:
-  measure = f"{measure}_adjusted1"
+if f"{measure}_fft" in BLACKLISTED_MEASURES:
+  measure = f"{measure}_fft"
 BLACKLISTED_MEASURES.remove(measure)
 
 
@@ -160,7 +160,7 @@ def estimator(envs, model, seed=99999, model_type="rf", _idx=None, name=None):
     """
 
     #wandb.watch(model, log='all')
-    wandb.init(project='rgm_irm', reinit=True, tags=[flags.wandb_tag])
+    wandb.init(project='rgm_single', reinit=True, tags=[flags.wandb_tag])
     wandb.config.update(flags)
     wandb.config.actual_measure = name
 
@@ -264,26 +264,3 @@ for idx, _ in enumerate(cms):
   runs_ood[r][idx] = baseline_ood_mses[idx]
   runs_val[r][idx] = baseline_val_mses[idx]
   runs_train[r][idx] = baseline_train_mses[idx]
-
-
-if False:
-  res = []
-  for idx, cm in enumerate(cms):
-    res.append({"measure": cm,
-                "ood_loss_mean": runs_ood[:, idx].mean(0), "ood_loss_std": runs_ood[:, idx].std(0),
-                "val_loss_mean": runs_val[:, idx].mean(0), "val_loss_std": runs_val[:, idx].std(0),
-                "train_loss_mean": runs_train[:, idx].mean(0), "train_loss_std": runs_train[:, idx].std(0),
-                "weight_mean": runs_weights[:, idx].mean(0), "weight_std": runs_weights[:, idx].std(0),
-                "bias_mean": runs_biases[:, idx].mean(0), "bias_std": runs_biases[:, idx].std(0),
-                "zeros_mean": runs_zeros[:, idx].mean(0), "zeros_std": runs_zeros[:, idx].std(0)
-              })
-
-  try:
-      os.mkdir("results")
-  except OSError:
-      pass
-
-  r_pd = pd.DataFrame(res).set_index("measure")
-  r_pd.to_csv("results/r_pd.csv")
-  pd.set_option('display.max_rows', None)
-  print("r_pd", r_pd)
