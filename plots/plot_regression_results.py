@@ -105,9 +105,10 @@ for row, env_split in enumerate(['all', 'lr', 'depth', 'width', 'train_size']):
         x = x / x[-1]
         ax = sns.heatmap(x[..., np.newaxis], cmap="Blues_r", cbar=(i+1)==len(data), cbar_kws={"aspect":35}, rasterized=True)
         ax.invert_yaxis()
-        plt.axhline(np.max(data[i][1])*points/maxx, color='black')
-        plt.axhline(np.mean(data[i][1])*points/maxx, color='orange')
-        plt.axhline(baseline[0][1].max()*points/maxx, color='red')
+        plt.axhline(baseline[0][1].max()*points/maxx, color='red', label='baseline')
+        plt.axhline(np.max(data[i][1])*points/maxx, color="limegreen", zorder=1, linewidth=1.5, label='max')
+        plt.axhline(np.percentile(data[i][1], q=90)*points/maxx, color="magenta", zorder=2, linewidth=1.5, linestyle="--", label='90th percentile')
+        plt.axhline(np.mean(data[i][1])*points/maxx, color='orange', zorder=2, linewidth=1.5, linestyle=":", label='mean')
         plt.ylabel('')
         if i==0:
             plt.ylabel(f"RMSE ({env_split.replace('_', ' ')})")
@@ -119,5 +120,6 @@ for row, env_split in enumerate(['all', 'lr', 'depth', 'width', 'train_size']):
             plt.xlabel(data[i][0].measure, rotation=45, fontsize=8, ha="right")
         else:
             plt.xlabel('')
+plt.legend(loc='upper left', ncol=4, bbox_to_anchor=(-23,-0.9), fontsize=8)
 plt.savefig(plotpath / f'cdf_{exp_type}.pdf', bbox_inches='tight')
 plt.close()
