@@ -117,7 +117,7 @@ for row, env_split in enumerate(['all', 'lr', 'depth', 'width', 'train_size']):
             plt.yticks([])
         plt.xticks([])
         if row+1 == rows:
-            plt.xlabel(data[i][0].measure, rotation=45, fontsize=8, ha="right")
+            plt.xlabel(data[i][0].measure.replace('_','.'), rotation=45, fontsize=8, ha="right")
         else:
             plt.xlabel('')
 plt.legend(loc='upper left', ncol=4, bbox_to_anchor=(-23,-0.9), fontsize=8)
